@@ -111,7 +111,8 @@ typedef struct {
 #define T1 					( pdMS_TO_TICKS(200) )
 #define T2 					( pdMS_TO_TICKS(500) )
 #define Tout 				( pdMS_TO_TICKS(200) )
-#define Pdrop 				( (double)0.01 ) 
+#define Pdrop 				( (double)0.01 )
+#define P_WRONG_PACKET		( (double)0.005 )
 #define Tdelay				( pdMS_TO_TICKS(200) )
 static const uint32_t	L1 = 1000;
 static const uint32_t	L2 = 2000;
@@ -587,6 +588,18 @@ void vRouterTask(void *pvParameters)
 			free(PacketRecieved->data);
 			free(PacketRecieved);
 			trace_printf("\n\nRouter Dropped Packet...\n");
+		}
+		else if(checkProb(P_WRONG_PACKET) == pdTRUE)
+		{
+			trace_printf("\n\nRouter Diverting Packet...\n");
+			PacketRecieved->header.reciever = (PacketRecieved->header.reciever == Node3Queue) ? Node4Queue : Node3Queue;
+
+			if(xQueueSend(PacketRecieved->header.reciever, &PacketRecieved, 0) != pdPASS)
+			{
+				trace_printf("\n\nReceiver Queue Full, Router Dropped Packet...\n");
+				free(PacketRecieved->data);
+				free(PacketRecieved);
+			}
 		}
 		else
 		{
