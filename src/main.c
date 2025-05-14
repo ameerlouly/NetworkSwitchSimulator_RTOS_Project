@@ -77,16 +77,23 @@
 
 /** Type Declarations	*******************************************************/
 
-typedef uint16_t SequenceNumber_t;
+typedef uint32_t SequenceNumber_t;
 typedef uint32_t NumOfError_t;
 typedef uint16_t NumOfPackets_t;
+typedef uint8_t  Payload_t;
 
 typedef struct {
 	QueueHandle_t sender;
 	QueueHandle_t reciever;
 
 	SequenceNumber_t sequenceNumber;
-	uint16_t data;
+
+	uint16_t length;
+} header_t;
+
+typedef struct {
+	header_t header;
+	Payload_t* data;
 } packet;
 
 typedef struct {
@@ -390,7 +397,7 @@ void vSenderTask(void *pvParameters)
 			continue;
 		}
 
-		PacketToSend->sender = CurrentNode->CurrentQueue;
+		PacketToSend->header.sender = CurrentNode->CurrentQueue;
 
 
 		RecieverNum = RandomNum(3, 4);
@@ -398,16 +405,17 @@ void vSenderTask(void *pvParameters)
 		switch(RecieverNum)
 		{
 		case 3:
-			PacketToSend->reciever = Node3Queue;
-			PacketToSend->sequenceNumber = ++SequenceToNode3;
+			PacketToSend->header.reciever = Node3Queue;
+			PacketToSend->header.sequenceNumber = ++SequenceToNode3;
 			break;
 		case 4:
-			PacketToSend->reciever = Node4Queue;
-			PacketToSend->sequenceNumber = ++SequenceToNode4;
+			PacketToSend->header.reciever = Node4Queue;
+			PacketToSend->header.sequenceNumber = ++SequenceToNode4;
 			break;
 		}
 
-		PacketToSend->data = RandomNum(L1, L2);
+		PacketToSend->header.length = RandomNum(L1, L2);
+		PacketToSend->data = calloc(PacketToSend->header.length - sizeof(header_t), sizeof(Payload_t));
 
 
 		xQueueSend(RouterQueue, &PacketToSend, portMAX_DELAY);
@@ -470,7 +478,7 @@ void vRecieverTask(void *pvParameters)
 //												  QueueHandleToNum(PacketRecieved->sender));
 
 		// Checks if the Received Packets are meant for the Current Node
-		if(PacketRecieved->reciever != CurrentNode->CurrentQueue)
+		if(PacketRecieved->header.reciever != CurrentNode->CurrentQueue)
 		{
 			WrongPackets++;
 			free(PacketRecieved);
@@ -478,24 +486,24 @@ void vRecieverTask(void *pvParameters)
 		else
 		{
 			trace_printf("\n\nNode %d: Received %d from %d No #%d\n", QueueHandleToNum(CurrentNode->CurrentQueue),
-																  PacketRecieved->data,
-																  QueueHandleToNum(PacketRecieved->sender),
-																  PacketRecieved->sequenceNumber);
+																  PacketRecieved->header.length,
+																  QueueHandleToNum(PacketRecieved->header.sender),
+																  PacketRecieved->header.sequenceNumber);
 
 					/** Handle Sequence Numbers and Count Lost Packets**/
-			switch(QueueHandleToNum(PacketRecieved->sender))
+			switch(QueueHandleToNum(PacketRecieved->header.sender))
 			{
 			case 1:
 				totalReceived1++;
-				totalLost1 += PacketRecieved->sequenceNumber - previousSequence1 - 1;
-				previousSequence1 = PacketRecieved->sequenceNumber;
+				totalLost1 += PacketRecieved->header.sequenceNumber - previousSequence1 - 1;
+				previousSequence1 = PacketRecieved->header.sequenceNumber;
 				trace_printf("Received: %d, Lost: %d", totalReceived1, totalLost1);
 				break;
 
 			case 2:
 				totalReceived2++;
-				totalLost2 += PacketRecieved->sequenceNumber - previousSequence2 - 1;
-				previousSequence2 = PacketRecieved->sequenceNumber;
+				totalLost2 += PacketRecieved->header.sequenceNumber - previousSequence2 - 1;
+				previousSequence2 = PacketRecieved->header.sequenceNumber;
 				trace_printf("Received: %d, Lost: %d\n\n", totalReceived2, totalLost2);
 				break;
 			}
@@ -577,9 +585,9 @@ void vRouterTask(void *pvParameters)
 			xTimerStart(CurrentNode->CurrentTimer, 0);
 			xSemaphoreTake(CurrentNode->SendDataSema, portMAX_DELAY);
 
-			if(xQueueSend(PacketRecieved->reciever, &PacketRecieved, 0) != pdPASS)
+			if(xQueueSend(PacketRecieved->header.reciever, &PacketRecieved, 0) != pdPASS)
 			{
-//				trace_printf("\n\nReceiver Queue Full, Router Dropped Packet...\n");
+				trace_printf("\n\nReceiver Queue Full, Router Dropped Packet...\n");
 				free(PacketRecieved);
 			}
 		}
