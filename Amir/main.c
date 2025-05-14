@@ -82,7 +82,7 @@ typedef struct {
     uint8_t sender;		//1 bytes
     uint32_t sequence;	//4 bytes
     uint16_t length;	//2 bytes
-    char data[];        //(lenght-8)  bytes
+    char data[];        //(lenght-8)  bytes          this is a flixible member
 } Packet_t;				//total: (lenght)  bytes
 
 // Queue handle
@@ -107,7 +107,7 @@ void Sender1Task(void *pvParameters) {
 
     while (1) {
 
-    	Packet_t *packet = (Packet_t *)malloc(sizeof(Packet_t)+1000-8);
+    	Packet_t *packet = (Packet_t *)malloc(sizeof(Packet_t)+1000-8);  // here we add the xize of the packet.  1000 is to be replaced with the random variable later
     		        if (!packet) {
     		            trace_puts("Sender1: malloc failed");
     		            vTaskDelay(pdMS_TO_TICKS(200));
@@ -120,8 +120,8 @@ void Sender1Task(void *pvParameters) {
         packet->destination = getRandom3or4();      // Example destination
         packet->sender =1;
         packet->sequence = seq++;
-        packet->length = 1000;
-        memset(packet->data, 0x0, packet->length-8);  // all payload bytes set to 0x0
+        packet->length = 1000;                       // 1000 is to be replaced with the random variable later
+        memset(packet->data, 0x0, packet->length-8);    // all payload bytes set to 0x0
 
         snprintf(packet->data, packet->length-8, "Hello from Sender1 #%u", packet->sequence);
 
@@ -145,7 +145,7 @@ void Sender2Task(void *pvParameters) {
    uint16_t seq = 0;
 
    while (1) {
-	   Packet_t *packet = (Packet_t *)malloc(sizeof(Packet_t)+1000-8);
+	   Packet_t *packet = (Packet_t *)malloc(sizeof(Packet_t)+1000-8);   // here we add the xize of the packet.  1000 is to be replaced with the random variable later
 	   	        if (!packet) {
 	   	            trace_puts("Sender2: malloc failed");
 	   	            vTaskDelay(pdMS_TO_TICKS(200));
@@ -158,8 +158,8 @@ void Sender2Task(void *pvParameters) {
        packet->destination = getRandom3or4();      // Example destination
        packet->sender =2;
        packet->sequence = seq++;
-       packet->length = 1000;
-       memset(packet->data, 0xF, packet->length-8);  // all payload bytes set to 0x0
+       packet->length = 1000;  // 1000 is to be replaced with the random variable later
+       memset(packet->data, 0xF, packet->length-8);    // all payload bytes set to 0x0
 
        snprintf(packet->data, packet->length-8, "Hello from Sender1 #%u", packet->sequence);
 
