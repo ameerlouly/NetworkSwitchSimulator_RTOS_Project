@@ -78,12 +78,13 @@
 
 typedef uint16_t SequenceNumber_t;
 typedef uint32_t NumOfError_t;
+typedef uint16_t NumOfPackets_t;
 
 typedef struct {
 	QueueHandle_t sender;
 	QueueHandle_t reciever;
 
-	uint32_t sequenceNumber;
+	SequenceNumber_t sequenceNumber;
 	uint16_t data;
 } packet;
 
@@ -358,7 +359,7 @@ static void vSenderTask(void *pvParameters)
 	static uint16_t SequenceToNode3 = 0;
 	static uint16_t SequenceToNode4 = 0;
 
-		/** Used for ACK Part (Commented Out for Phase 1)	**/
+//?		/** Used for ACK Part (Commented Out for Phase 1)	**/
 //	packet* PacketRecieved = NULL; // Buffer to store recieved ACK Packets
 //	BaseType_t status;
 
@@ -373,7 +374,7 @@ static void vSenderTask(void *pvParameters)
 		xSemaphoreTake(CurrentNode->SendDataSema, portMAX_DELAY);	// Dont Start Sending Data until allowed; Sema = 0
 
 			/* Generate and Send Packet when Semaphore is Taken */
-//		PacketToSend = PacketGenerator(CurrentNode->CurrentQueue);
+//		PacketToSend = PacketGenerator(CurrentNode->CurrentQueue);	//! PacketGenerator Function causes a bug, commented out for now
 
 		PacketToSend = malloc(sizeof(packet));
 		if(PacketToSend == NULL)
@@ -439,8 +440,16 @@ static void vRecieverTask(void *pvParameters)
 	packet* PacketRecieved = NULL;		// Buffer to Store Received Packets
 	packet* PacketToSend = NULL;	// Buffer to Store ACKs
 
-	static SequenceNumber_t previousSequene = 0; // Contains the sequence number of the last packet
 	static NumOfError_t WrongPackets = 0;
+
+	static SequenceNumber_t previousSequene1 = 0;
+	static SequenceNumber_t previousSequene2 = 0;
+
+	static NumOfPackets_t totalReceived1 = 0;
+	static NumOfPackets_t totalReceived2 = 0;
+	static NumOfPackets_t totalLost1 = 0;
+	static NumOfPackets_t totalLost2 = 0;
+
 
 	while(1)
 	{
@@ -456,6 +465,46 @@ static void vRecieverTask(void *pvParameters)
 		}
 		else
 		{
+					/** Handle Sequence Numbers and Count Lost Packets**/
+			switch(QueueHandleToNum(PacketRecieved->sender))
+			{
+			case 1:
+				totalReceived1++;
+				totalLost1 += PacketRecieved->sequenceNumber - previousSequene1 - 1;
+				previousSequene1 = PacketRecieved->sequenceNumber;
+				break;
+
+			case 2:
+				totalReceived1++;
+				totalLost1 += PacketRecieved->sequenceNumber - previousSequene1 - 1;
+				previousSequene1 = PacketRecieved->sequenceNumber;
+				break;
+			}
+
+			// Suspend Current Task if it has received 2000 or more Packets
+			if((totalReceived1 + totalLost1) >= 2000 && (totalReceived2 + totalLost2) >= 2000)
+			{
+				vTaskSuspend(CurrentNode->CurrentTask);
+				trace_printf("\n**Suspended Node %d...Printing Node Statistics....\n",
+										QueueHandleToNum(CurrentNode->CurrentQueue));
+				trace_printf("\nTotal Packets from 1: %d\n", totalReceived1 + totalLost1);
+				trace_printf("Total Received from 1: %d\n", totalReceived1);
+				trace_printf("Total Lost from 1: %d\n", totalLost1);
+				trace_printf("Lost \% %.2f", ((float)totalLost1/(totalReceived1 + totalLost1)) * 100);
+
+				trace_printf("\nTotal Packets from 2: %d\n", totalReceived2 + totalLost2);
+				trace_printf("Total Received from 2: %d\n", totalReceived2);
+				trace_printf("Total Lost from 2: %d\n", totalLost2);
+				trace_printf("Lost \% %.2f", ((float)totalLost2/(totalReceived2 + totalLost2)) * 100);
+			}
+
+			if((eTaskGetState(Node2Task) == eSuspended) &&
+			   (eTaskGetState(Node1Task) == eSuspended))
+			{
+				vTaskSuspendAll();
+				trace_printf("\n___System Suspended___");
+			}
+
 //?			/**  ACK Part (Commented Out for Phase 1)	**/
 //			PacketToSend = malloc(sizeof(packet));
 //
@@ -483,21 +532,22 @@ static void vRouterTask(void *pvParameters)
 	{
 		xQueueReceive(RouterQueue, &PacketRecieved, portMAX_DELAY);
 
-		trace_printf("\nReceived Packet from %d to %d\n", QueueHandleToNum(PacketRecieved->sender),
-													   QueueHandleToNum(PacketRecieved->reciever));
-		if(PacketRecieved->data == ACK_PACKET)
-		{
-			trace_printf("Content: ACK\n");
-		}
-		else
-		{
-			trace_printf("Content: %d\n", PacketRecieved->data);
-		}
+		//! Router Recieved Data Printer
+//		trace_printf("\nReceived Packet from %d to %d\n", QueueHandleToNum(PacketRecieved->sender),
+//													   QueueHandleToNum(PacketRecieved->reciever));
+//		if(PacketRecieved->data == ACK_PACKET)
+//		{
+//			trace_printf("Content: ACK\n");
+//		}
+//		else
+//		{
+//			trace_printf("Content: %d\n", PacketRecieved->data);
+//		}
 
 		if(checkProb(Pdrop) == pdTRUE)
 		{
 			free(PacketRecieved);
-			trace_printf("Packet Dropped...\n");
+			trace_printf("Router Dropped Packet...\n");
 		}
 		else
 		{
@@ -507,7 +557,7 @@ static void vRouterTask(void *pvParameters)
 
 			if(xQueueSend(PacketRecieved->reciever, &PacketRecieved, 0) != pdPASS)
 			{
-				trace_printf("Queue Full, Packet Dropped\n");
+				trace_printf("Receiver Queue Full, Router Dropped Packet...\n");
 				free(PacketRecieved);
 			}
 		}
@@ -557,6 +607,9 @@ static void vRouterDelayCallBack(TimerHandle_t xTimer)
 	}
 }
 
+//!		/**		ACK Part (Commented Out for Phase 1)	**/
+
+//? This is Alternative Solution for the ACK Receive and Delay, not completed
 //void vACKToutCallBack(TimerHandle_t xTimer)
 //{
 //	trace_puts("Inside Timer Callback");
