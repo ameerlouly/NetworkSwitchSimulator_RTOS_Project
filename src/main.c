@@ -593,6 +593,8 @@ void vRouterTask(void *pvParameters)
 		{
 			trace_printf("\n\nRouter Diverting Packet...\n");
 			PacketRecieved->header.reciever = (PacketRecieved->header.reciever == Node3Queue) ? Node4Queue : Node3Queue;
+			xTimerStart(CurrentNode->CurrentTimer, 0);
+			xSemaphoreTake(CurrentNode->SendDataSema, portMAX_DELAY);
 
 			if(xQueueSend(PacketRecieved->header.reciever, &PacketRecieved, 0) != pdPASS)
 			{
