@@ -394,6 +394,7 @@ void vSenderTask(void *pvParameters)
 		if(PacketToSend == NULL)
 		{
 			// Failed to Generate Packet, Trying Again
+			trace_puts("Failed to Allocate Packet");
 			continue;
 		}
 
@@ -416,6 +417,11 @@ void vSenderTask(void *pvParameters)
 
 		PacketToSend->header.length = RandomNum(L1, L2);
 		PacketToSend->data = calloc(PacketToSend->header.length - sizeof(header_t), sizeof(Payload_t));
+		if(PacketToSend->data == NULL)
+		{
+			trace_puts("Failed to allocate data");
+			continue;
+		}
 
 
 		xQueueSend(RouterQueue, &PacketToSend, portMAX_DELAY);
