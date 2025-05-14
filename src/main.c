@@ -398,6 +398,15 @@ void vSenderTask(void *pvParameters)
 			continue;
 		}
 
+		PacketToSend->header.length = RandomNum(L1, L2);
+		PacketToSend->data = calloc(PacketToSend->header.length - sizeof(header_t), sizeof(Payload_t));
+		if(PacketToSend->data == NULL)
+		{
+			trace_puts("Failed to allocate data");
+			free(PacketToSend);
+			continue;
+		}
+
 		PacketToSend->header.sender = CurrentNode->CurrentQueue;
 
 
@@ -413,14 +422,6 @@ void vSenderTask(void *pvParameters)
 			PacketToSend->header.reciever = Node4Queue;
 			PacketToSend->header.sequenceNumber = ++SequenceToNode4;
 			break;
-		}
-
-		PacketToSend->header.length = RandomNum(L1, L2);
-		PacketToSend->data = calloc(PacketToSend->header.length - sizeof(header_t), sizeof(Payload_t));
-		if(PacketToSend->data == NULL)
-		{
-			trace_puts("Failed to allocate data");
-			continue;
 		}
 
 
@@ -487,6 +488,7 @@ void vRecieverTask(void *pvParameters)
 		if(PacketRecieved->header.reciever != CurrentNode->CurrentQueue)
 		{
 			WrongPackets++;
+			free(PacketRecieved->data);
 			free(PacketRecieved);
 		}
 		else
@@ -514,7 +516,7 @@ void vRecieverTask(void *pvParameters)
 				break;
 			}
 
-
+			free(PacketRecieved->data);
 			free(PacketRecieved);
 
 			// Suspend Current Task if it has received 2000 or more Packets
