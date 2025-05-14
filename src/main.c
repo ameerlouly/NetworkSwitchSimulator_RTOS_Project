@@ -465,6 +465,11 @@ static void vRecieverTask(void *pvParameters)
 		}
 		else
 		{
+			trace_printf("Node %d: Received %d from %d No #%d\n", QueueHandleToNum(CurrentNode->CurrentQueue),
+																  PacketRecieved->data,
+																  QueueHandleToNum(PacketRecieved->sender),
+																  PacketRecieved->sequenceNumber);
+
 					/** Handle Sequence Numbers and Count Lost Packets**/
 			switch(QueueHandleToNum(PacketRecieved->sender))
 			{
@@ -472,19 +477,23 @@ static void vRecieverTask(void *pvParameters)
 				totalReceived1++;
 				totalLost1 += PacketRecieved->sequenceNumber - previousSequene1 - 1;
 				previousSequene1 = PacketRecieved->sequenceNumber;
+				trace_printf("Received: %d, Lost: %d", totalReceived1, totalLost1);
 				break;
 
 			case 2:
-				totalReceived1++;
-				totalLost1 += PacketRecieved->sequenceNumber - previousSequene1 - 1;
-				previousSequene1 = PacketRecieved->sequenceNumber;
+				totalReceived2++;
+				totalLost2 += PacketRecieved->sequenceNumber - previousSequene2 - 1;
+				previousSequene2 = PacketRecieved->sequenceNumber;
+				trace_printf("Received: %d, Lost: %d\n\n", totalReceived2, totalLost2);
 				break;
 			}
 
+
+			free(PacketRecieved);
+
 			// Suspend Current Task if it has received 2000 or more Packets
-			if((totalReceived1 + totalLost1) >= 2000 && (totalReceived2 + totalLost2) >= 2000)
+			if((totalReceived1 + totalLost1 + totalReceived2 + totalLost2) >= 2000)
 			{
-				vTaskSuspend(CurrentNode->CurrentTask);
 				trace_printf("\n**Suspended Node %d...Printing Node Statistics....\n",
 										QueueHandleToNum(CurrentNode->CurrentQueue));
 				trace_printf("\nTotal Packets from 1: %d\n", totalReceived1 + totalLost1);
@@ -496,13 +505,15 @@ static void vRecieverTask(void *pvParameters)
 				trace_printf("Total Received from 2: %d\n", totalReceived2);
 				trace_printf("Total Lost from 2: %d\n", totalLost2);
 				trace_printf("Lost \% %.2f", ((float)totalLost2/(totalReceived2 + totalLost2)) * 100);
+
+				vTaskSuspend(CurrentNode->CurrentTask);
 			}
 
 			if((eTaskGetState(Node2Task) == eSuspended) &&
 			   (eTaskGetState(Node1Task) == eSuspended))
 			{
-				vTaskSuspendAll();
 				trace_printf("\n___System Suspended___");
+				vTaskSuspendAll();
 			}
 
 //?			/**  ACK Part (Commented Out for Phase 1)	**/
@@ -516,7 +527,6 @@ static void vRecieverTask(void *pvParameters)
 //			free(PacketRecieved);
 //
 //			xQueueSend(RouterQueue, &PacketToSend, 0); // Send ACK
-			free(PacketRecieved);
 		}
 	}
 
