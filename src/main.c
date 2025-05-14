@@ -584,6 +584,7 @@ void vRouterTask(void *pvParameters)
 
 		if(checkProb(Pdrop) == pdTRUE)
 		{
+			free(PacketRecieved->data);
 			free(PacketRecieved);
 			trace_printf("\n\nRouter Dropped Packet...\n");
 		}
@@ -596,6 +597,7 @@ void vRouterTask(void *pvParameters)
 			if(xQueueSend(PacketRecieved->header.reciever, &PacketRecieved, 0) != pdPASS)
 			{
 				trace_printf("\n\nReceiver Queue Full, Router Dropped Packet...\n");
+				free(PacketRecieved->data);
 				free(PacketRecieved);
 			}
 		}
