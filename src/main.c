@@ -288,11 +288,11 @@ int main(int argc, char* argv[])
 //	}
 
 	/** Creating Queues **/
-	Node1Queue = xQueueCreate(5, sizeof(packet));
-	Node2Queue = xQueueCreate(5, sizeof(packet));
-	Node3Queue = xQueueCreate(5, sizeof(packet));
-	Node4Queue = xQueueCreate(5, sizeof(packet));
-	RouterQueue = xQueueCreate(10, sizeof(packet));
+	Node1Queue = xQueueCreate(10, sizeof(packet));
+	Node2Queue = xQueueCreate(10, sizeof(packet));
+	Node3Queue = xQueueCreate(10, sizeof(packet));
+	Node4Queue = xQueueCreate(10, sizeof(packet));
+	RouterQueue = xQueueCreate(20, sizeof(packet));
 
 	/** Creating Semaphores **/
 	Node1SendData = xSemaphoreCreateBinary();
@@ -334,7 +334,7 @@ int main(int argc, char* argv[])
 		status &= xTaskCreate(vSenderTask, "Node 2", 1024, (void*)&Node2, 1, &Node2Task);
 		status &= xTaskCreate(vRecieverTask, "Node 3", 1024, (void*)&Node3, 2, &Node3Task);
 		status &= xTaskCreate(vRecieverTask, "Node 4", 1024, (void*)&Node4, 2, &Node4Task);
-		status &= xTaskCreate(vRouterTask, "Router", 2048, (void*)&Router, 3, &RouterTask);
+		status &= xTaskCreate(vRouterTask, "Router", 1024, (void*)&Router, 3, &RouterTask);
 		
 
 		if(status == pdPASS)
@@ -396,6 +396,8 @@ void vSenderTask(void *pvParameters)
 		{
 			// Failed to Generate Packet, Trying Again
 			trace_puts("Failed to Allocate Packet");
+			free(PacketToSend->data);
+			free(PacketToSend);
 			continue;
 		}
 
@@ -404,6 +406,7 @@ void vSenderTask(void *pvParameters)
 		if(PacketToSend->data == NULL)
 		{
 			trace_puts("Failed to allocate data");
+			free(PacketToSend->data);
 			free(PacketToSend);
 			continue;
 		}
@@ -491,6 +494,7 @@ void vRecieverTask(void *pvParameters)
 			WrongPackets++;
 			free(PacketRecieved->data);
 			free(PacketRecieved);
+			continue;
 		}
 		else
 		{
