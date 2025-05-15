@@ -335,11 +335,11 @@ int main(int argc, char* argv[])
 			RouterQueue != NULL)	// Check if Queue Creation was successful
 	{
 		// Creating Tasks
-		status = xTaskCreate(vSenderTask, "Node 1", 1024, (void*)&Node1, 1, &Node1Task);
-		status &= xTaskCreate(vSenderTask, "Node 2", 1024, (void*)&Node2, 1, &Node2Task);
-		status &= xTaskCreate(vRecieverTask, "Node 3", 1024, (void*)&Node3, 2, &Node3Task);
-		status &= xTaskCreate(vRecieverTask, "Node 4", 1024, (void*)&Node4, 2, &Node4Task);
-		status &= xTaskCreate(vRouterTask, "Router", 1024, (void*)&Router, 3, &RouterTask);
+		status = xTaskCreate(vSenderTask, "Node 1", 512, (void*)&Node1, 1, &Node1Task);
+		status &= xTaskCreate(vSenderTask, "Node 2", 512, (void*)&Node2, 1, &Node2Task);
+		status &= xTaskCreate(vRecieverTask, "Node 3", 512, (void*)&Node3, 2, &Node3Task);
+		status &= xTaskCreate(vRecieverTask, "Node 4", 512, (void*)&Node4, 2, &Node4Task);
+		status &= xTaskCreate(vRouterTask, "Router", 512, (void*)&Router, 3, &RouterTask);
 		
 
 		if(status == pdPASS)
