@@ -88,11 +88,12 @@ typedef struct {
 
 	SequenceNumber_t sequenceNumber;
 
-	uint16_t length;
+
 } header_t;
 
 typedef struct {
 	header_t header;
+	uint16_t length;
 	Payload_t* data;
 } packet;
 
@@ -111,7 +112,8 @@ typedef struct {
 #define T1 					( pdMS_TO_TICKS(200) )
 #define T2 					( pdMS_TO_TICKS(500) )
 #define Tout 				( pdMS_TO_TICKS(200) )
-#define Pdrop 				( (double)0.01 ) 
+#define Pdrop 				( (double)0.01 )
+#define P_WRONG_PACKET		( (double)0.005 )
 #define Tdelay				( pdMS_TO_TICKS(200) )
 static const uint32_t	L1 = 1000;
 static const uint32_t	L2 = 2000;
@@ -250,6 +252,7 @@ BaseType_t checkProb(double prob)
 	}
 }
 
+
 //** End of Helpful Functions Definitions **************************************/
 
 int main(int argc, char* argv[])
@@ -334,7 +337,7 @@ int main(int argc, char* argv[])
 		status &= xTaskCreate(vRecieverTask, "Node 3", 1024, (void*)&Node3, 2, &Node3Task);
 		status &= xTaskCreate(vRecieverTask, "Node 4", 1024, (void*)&Node4, 2, &Node4Task);
 		status &= xTaskCreate(vRouterTask, "Router", 2048, (void*)&Router, 3, &RouterTask);
-		
+
 
 		if(status == pdPASS)
 		{
@@ -398,8 +401,8 @@ void vSenderTask(void *pvParameters)
 			continue;
 		}
 
-		PacketToSend->header.length = RandomNum(L1, L2);
-		PacketToSend->data = calloc(PacketToSend->header.length - sizeof(header_t), sizeof(Payload_t));
+		PacketToSend->length = RandomNum(L1, L2);
+		PacketToSend->data = calloc(PacketToSend->length - sizeof(header_t), sizeof(Payload_t));
 		if(PacketToSend->data == NULL)
 		{
 			trace_puts("Failed to allocate data");
@@ -467,7 +470,8 @@ void vRecieverTask(void *pvParameters)
 
 	static uint8_t Finished = 0;
 
-	static NumOfError_t WrongPackets = 0;
+	static NumOfError_t WrongPackets1= 0;
+	static NumOfError_t WrongPackets2= 0;
 
 	SequenceNumber_t previousSequence1 = 0;
 	SequenceNumber_t previousSequence2 = 0;
@@ -487,14 +491,35 @@ void vRecieverTask(void *pvParameters)
 		// Checks if the Received Packets are meant for the Current Node
 		if(PacketRecieved->header.reciever != CurrentNode->CurrentQueue)
 		{
-			WrongPackets++;
-			free(PacketRecieved->data);
-			free(PacketRecieved);
+
+			trace_printf("\n\n__ERROR__: Node %d: Received %d from %d No #%d\n", QueueHandleToNum(CurrentNode->CurrentQueue),
+																  PacketRecieved->length,
+																  QueueHandleToNum(PacketRecieved->header.sender),
+																  PacketRecieved->header.sequenceNumber);
+
+			switch(QueueHandleToNum(PacketRecieved->header.sender))
+			{
+			case 1:
+				totalReceived2++;
+				WrongPackets2++;
+				totalLost2 += PacketRecieved->header.sequenceNumber - previousSequence2 - 1;
+				previousSequence2 = PacketRecieved->header.sequenceNumber;
+				trace_printf("Received: %d, Lost: %d", totalReceived2, totalLost2);
+				break;
+
+			case 2:
+				totalReceived1++;
+				WrongPackets1++;
+				totalLost1 += PacketRecieved->header.sequenceNumber - previousSequence1 - 1;
+				previousSequence1 = PacketRecieved->header.sequenceNumber;
+				trace_printf("Received: %d, Lost: %d\n\n", totalReceived1, totalLost1);
+				break;
+			}
 		}
 		else
 		{
 			trace_printf("\n\nNode %d: Received %d from %d No #%d\n", QueueHandleToNum(CurrentNode->CurrentQueue),
-																  PacketRecieved->header.length,
+																  PacketRecieved->length,
 																  QueueHandleToNum(PacketRecieved->header.sender),
 																  PacketRecieved->header.sequenceNumber);
 
@@ -515,6 +540,7 @@ void vRecieverTask(void *pvParameters)
 				trace_printf("Received: %d, Lost: %d\n\n", totalReceived2, totalLost2);
 				break;
 			}
+		}
 
 			free(PacketRecieved->data);
 			free(PacketRecieved);
@@ -526,11 +552,13 @@ void vRecieverTask(void *pvParameters)
 										QueueHandleToNum(CurrentNode->CurrentQueue));
 				trace_printf("\nTotal Packets from 1: %d\n", totalReceived1 + totalLost1);
 				trace_printf("Total Received from 1: %d\n", totalReceived1);
+				trace_printf("Total Wrong Received Packets: %d\n", WrongPackets1);
 				trace_printf("Total Lost from 1: %d\n", totalLost1);
 //				trace_printf("Lost \% %d", ((float)totalLost1/(totalReceived1 + totalLost1)) * 100);
 
 				trace_printf("\nTotal Packets from 2: %d\n", totalReceived2 + totalLost2);
 				trace_printf("Total Received from 2: %d\n", totalReceived2);
+				trace_printf("Total Wrong Received Packets: %d\n", WrongPackets2);
 				trace_printf("Total Lost from 2: %d\n", totalLost2);
 //				trace_printf("Lost \% %d", (uint32_t)((float)totalLost2 / (totalReceived2 + totalLost2)) * 100);
 
@@ -555,7 +583,7 @@ void vRecieverTask(void *pvParameters)
 //			free(PacketRecieved);
 //
 //			xQueueSend(RouterQueue, &PacketToSend, 0); // Send ACK
-		}
+
 	}
 
 }
@@ -594,12 +622,28 @@ void vRouterTask(void *pvParameters)
 			xTimerStart(CurrentNode->CurrentTimer, 0);
 			xSemaphoreTake(CurrentNode->SendDataSema, portMAX_DELAY);
 
-			if(xQueueSend(PacketRecieved->header.reciever, &PacketRecieved, 0) != pdPASS)
-			{
-				trace_printf("\n\nReceiver Queue Full, Router Dropped Packet...\n");
-				free(PacketRecieved->data);
-				free(PacketRecieved);
+			if(checkProb(P_WRONG_PACKET) == pdTRUE){
+					QueueHandle_t destination =(PacketRecieved->header.reciever ==Node3Queue)?Node3Queue : Node4Queue;
+				if(xQueueSend(destination, &PacketRecieved, 0) != pdPASS)
+				{
+					trace_printf("\n\nReceiver Queue Full, Router Dropped Packet...\n");
+					free(PacketRecieved->data);
+					free(PacketRecieved);
+				}
+
 			}
+			else{
+
+				if(xQueueSend(PacketRecieved->header.reciever, &PacketRecieved, 0) != pdPASS)
+				{
+					trace_printf("\n\nReceiver Queue Full, Router Dropped Packet...\n");
+					free(PacketRecieved->data);
+					free(PacketRecieved);
+				}
+
+			}
+
+
 		}
 	}
 }
