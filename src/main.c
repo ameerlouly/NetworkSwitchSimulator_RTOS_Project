@@ -288,8 +288,8 @@ int main(int argc, char* argv[])
 //	}
 
 	/** Creating Queues **/
-	Node1Queue = xQueueCreate(10, sizeof(packet));
-	Node2Queue = xQueueCreate(10, sizeof(packet));
+	Node1Queue = xQueueCreate(1, sizeof(packet));
+	Node2Queue = xQueueCreate(1, sizeof(packet));
 	Node3Queue = xQueueCreate(10, sizeof(packet));
 	Node4Queue = xQueueCreate(10, sizeof(packet));
 	RouterQueue = xQueueCreate(20, sizeof(packet));
