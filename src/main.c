@@ -72,6 +72,7 @@
 #define NUM_OF_TRIES 			(uint8_t)4
 #define PACKET_SENT				(uint8_t)1
 #define MAX_NUM_OF_PACKETS		(uint16_t)4000
+#define DivertPacket(PacketToDivert) 		( (PacketToDivert == Node3Queue)? Node4Queue : Node3Queue )
 
 /** End of Macros *************************************************************/
 
@@ -608,7 +609,7 @@ void vRouterTask(void *pvParameters)
 			xTimerStart(CurrentNode->CurrentTimer, 0);
 			xSemaphoreTake(CurrentNode->SendDataSema, portMAX_DELAY);
 
-			if(xQueueSend((PacketRecieved->header.reciever == Node3Queue) ? Node4Queue : Node3Queue, &PacketRecieved, 0) != pdPASS)
+			if(xQueueSend(DivertPacket(PacketRecieved->header.reciever), &PacketRecieved, 0) != pdPASS)
 			{
 				trace_printf("\n\nReceiver Queue Full, Router Dropped Packet...\n");
 				free(PacketRecieved->data);
