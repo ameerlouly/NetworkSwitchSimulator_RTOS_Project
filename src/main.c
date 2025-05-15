@@ -492,7 +492,7 @@ void vRecieverTask(void *pvParameters)
 
 	while(1)
 	{
-		status = xQueueReceive(CurrentNode->CurrentQueue, &PacketRecieved, pdMS_TO_TICKS(5));
+		status = xQueueReceive(CurrentNode->CurrentQueue, &PacketRecieved, pdMS_TO_TICKS(1));
 		if(status != pdPASS)
 		{
 			continue;
@@ -507,40 +507,31 @@ void vRecieverTask(void *pvParameters)
 		free(PacketRecieved->data);
 		free(PacketRecieved);
 
-		// Checks if the Received Packets are meant for the Current Node
-		if((RecieverQueue != CurrentNode->CurrentQueue))
-		{
-			WrongPackets++;
-			previousSequence1 = previousSequence1;
-			previousSequence2 = previousSequence2;
-			free(PacketRecieved->data);
-			free(PacketRecieved);
-			continue;
-		}
-		else if(RecieverQueue == CurrentNode->CurrentQueue)
-		{
-			trace_printf("\n\nNode %d: Received %d from %d No #%d\n", QueueHandleToNum(CurrentNode->CurrentQueue),
-																  	  ReceivedLength,
-																  	  QueueHandleToNum(SenderQueue),
-																  	  CurrentSequence);
+		trace_printf("\n\nNode %d: Received %d from %d to %d No #%d\n", QueueHandleToNum(CurrentNode->CurrentQueue),
+																  	  	ReceivedLength,
+																  	  	QueueHandleToNum(SenderQueue),
+																	  	QueueHandleToNum(RecieverQueue),
+																  	  	CurrentSequence);
 
+		// Checks if the Received Packets are meant for the Current Node
+		if(QueueHandleToNum(RecieverQueue) == QueueHandleToNum(CurrentNode->CurrentQueue))
+		{
 					/** Handle Sequence Numbers and Count Lost Packets**/
 			switch(QueueHandleToNum(SenderQueue))
 			{
 			case 1:
-				totalReceived++;
 				totalLost += CurrentSequence - previousSequence1 - 1;
 				previousSequence1 = CurrentSequence;
-				trace_printf("Received: %d, Lost: %d", totalReceived, totalLost);
 				break;
 
 			case 2:
-				totalReceived++;
 				totalLost += CurrentSequence - previousSequence2 - 1;
 				previousSequence2 = CurrentSequence;
-				trace_printf("Received: %d, Lost: %d\n\n", totalReceived, totalLost);
 				break;
 			}
+
+			totalReceived++;
+			trace_printf("Received: %d, Lost: %d, Diverted: %d\n\n", totalReceived, totalLost, WrongPackets);
 
 			free(PacketRecieved->data);
 			free(PacketRecieved);
@@ -551,7 +542,7 @@ void vRecieverTask(void *pvParameters)
 				trace_printf("\n**SYSTEM SUSPENDED...PRINTING STATISTICS....\n");
 				trace_printf("\nTotal Packets: %d\n", totalReceived + totalLost);
 				trace_printf("Total Received: %d\n", totalReceived);
-				trace_printf("Total Lost: %d\n", totalLost);
+				trace_printf("Total Lost: %d\n", totalLost - WrongPackets);
 //				trace_printf("Lost \% %d", ((float)totalLost1/(totalReceived1 + totalLost1)) * 100);
 				trace_printf("Diverted Packets: %d\n", WrongPackets);
 				vTaskSuspendAll(); // Suspends Task
@@ -575,6 +566,7 @@ void vRecieverTask(void *pvParameters)
 														   				 QueueHandleToNum(SenderQueue));
 			free(PacketRecieved->data);
 			free(PacketRecieved);
+			WrongPackets++;
 		}
 	}
 
@@ -612,11 +604,10 @@ void vRouterTask(void *pvParameters)
 		else if(checkProb(P_WRONG_PACKET) == pdTRUE)
 		{
 			trace_printf("\n\nRouter Diverting Packet...\n");
-			PacketRecieved->header.reciever = (PacketRecieved->header.reciever == Node3Queue) ? Node4Queue : Node3Queue;
 			xTimerStart(CurrentNode->CurrentTimer, 0);
 			xSemaphoreTake(CurrentNode->SendDataSema, portMAX_DELAY);
 
-			if(xQueueSend(PacketRecieved->header.reciever, &PacketRecieved, 0) != pdPASS)
+			if(xQueueSend((PacketRecieved->header.reciever == Node3Queue) ? Node4Queue : Node3Queue, &PacketRecieved, 0) != pdPASS)
 			{
 				trace_printf("\n\nReceiver Queue Full, Router Dropped Packet...\n");
 				free(PacketRecieved->data);
