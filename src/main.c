@@ -510,9 +510,11 @@ void vRecieverTask(void *pvParameters)
 		free(PacketRecieved);
 
 		// Checks if the Received Packets are meant for the Current Node
-		if(RecieverQueue != CurrentNode->CurrentQueue)
+		if((RecieverQueue != CurrentNode->CurrentQueue))
 		{
 			WrongPackets++;
+			previousSequence1 = previousSequence1;
+			previousSequence2 = previousSequence2;
 			free(PacketRecieved->data);
 			free(PacketRecieved);
 			continue;
@@ -520,9 +522,9 @@ void vRecieverTask(void *pvParameters)
 		else if(RecieverQueue == CurrentNode->CurrentQueue)
 		{
 			trace_printf("\n\nNode %d: Received %d from %d No #%d\n", QueueHandleToNum(CurrentNode->CurrentQueue),
-																  ReceivedLength,
-																  QueueHandleToNum(SenderQueue),
-																  CurrentSequence);
+																  	  ReceivedLength,
+																  	  QueueHandleToNum(SenderQueue),
+																  	  CurrentSequence);
 
 					/** Handle Sequence Numbers and Count Lost Packets**/
 			switch(QueueHandleToNum(SenderQueue))
@@ -548,21 +550,13 @@ void vRecieverTask(void *pvParameters)
 			// Suspend Current Task if it has received 2000 or more Packets
 			if((totalReceived + totalLost) >= MAX_NUM_OF_PACKETS)
 			{
-				trace_printf("\n**Suspended Node %d...Printing Node Statistics....\n",
-										QueueHandleToNum(CurrentNode->CurrentQueue));
+				trace_printf("\n**SYSTEM SUSPENDED...PRINTING STATISTICS....\n");
 				trace_printf("\nTotal Packets: %d\n", totalReceived + totalLost);
 				trace_printf("Total Received: %d\n", totalReceived);
 				trace_printf("Total Lost: %d\n", totalLost);
 //				trace_printf("Lost \% %d", ((float)totalLost1/(totalReceived1 + totalLost1)) * 100);
-
-				if(Finished)
-				{
-					vTaskSuspendAll();
-				}
-
-//				vTaskSuspend(CurrentNode->CurrentTask);
-				Finished = 1;
-				vTaskSuspend(CurrentNode->CurrentTask); // Suspends Task
+				trace_printf("Diverted Packets: %d\n", WrongPackets);
+				vTaskSuspendAll(); // Suspends Task
 			}
 
 //?			/**  ACK Part (Commented Out for Phase 1)	**/
@@ -580,7 +574,7 @@ void vRecieverTask(void *pvParameters)
 		else
 		{
 			trace_printf("\n\nNode %d: Received Wrong Packet from %d\n", QueueHandleToNum(CurrentNode->CurrentQueue),
-														   QueueHandleToNum(SenderQueue));
+														   				 QueueHandleToNum(SenderQueue));
 			free(PacketRecieved->data);
 			free(PacketRecieved);
 		}
