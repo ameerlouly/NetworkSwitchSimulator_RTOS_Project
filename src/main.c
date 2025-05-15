@@ -474,6 +474,11 @@ void vRecieverTask(void *pvParameters)
 	packet* PacketRecieved = NULL;		// Buffer to Store Received Packets
 //	packet* PacketToSend = NULL;	// Buffer to Store ACKs
 
+	BaseType_t status = pdFAIL;
+
+	QueueHandle_t SenderQueue = NULL;
+	SequenceNumber_t CurrentSequence = 0;
+
 	static uint8_t Finished = 0;
 
 	static NumOfError_t WrongPackets = 0;
@@ -487,9 +492,14 @@ void vRecieverTask(void *pvParameters)
 
 	while(1)
 	{
-		xQueueReceive(CurrentNode->CurrentQueue, &PacketRecieved, portMAX_DELAY);
-//		trace_printf("Received: %d from Node %d", PacketRecieved->data,
-//												  QueueHandleToNum(PacketRecieved->sender));
+		status = xQueueReceive(CurrentNode->CurrentQueue, &PacketRecieved, 0);
+		if(status != pdPASS)
+		{
+			continue;
+		}
+		
+		SenderQueue = PacketRecieved->header.sender;
+		CurrentSequence = PacketRecieved->header.sequenceNumber;
 
 		// Checks if the Received Packets are meant for the Current Node
 		if(PacketRecieved->header.reciever != CurrentNode->CurrentQueue)
@@ -499,7 +509,7 @@ void vRecieverTask(void *pvParameters)
 			free(PacketRecieved);
 			continue;
 		}
-		else
+		else if(PacketRecieved->header.reciever == CurrentNode->CurrentQueue)
 		{
 			trace_printf("\n\nNode %d: Received %d from %d No #%d\n", QueueHandleToNum(CurrentNode->CurrentQueue),
 																  PacketRecieved->header.length,
@@ -534,7 +544,7 @@ void vRecieverTask(void *pvParameters)
 										QueueHandleToNum(CurrentNode->CurrentQueue));
 				trace_printf("\nTotal Packets: %d\n", totalReceived + totalLost);
 				trace_printf("Total Received: %d\n", totalReceived);
-				trace_printf("Total Lost from: %d\n", totalLost);
+				trace_printf("Total Lost: %d\n", totalLost);
 //				trace_printf("Lost \% %d", ((float)totalLost1/(totalReceived1 + totalLost1)) * 100);
 
 				if(Finished)
@@ -558,6 +568,13 @@ void vRecieverTask(void *pvParameters)
 //			free(PacketRecieved);
 //
 //			xQueueSend(RouterQueue, &PacketToSend, 0); // Send ACK
+		}
+		else
+		{
+			trace_printf("\n\nNode %d: Received Wrong Packet from %d\n", QueueHandleToNum(CurrentNode->CurrentQueue),
+														   QueueHandleToNum(PacketRecieved->header.sender));
+			free(PacketRecieved->data);
+			free(PacketRecieved);
 		}
 	}
 
