@@ -85,6 +85,11 @@ typedef uint8_t  Payload_t;
 typedef struct {
 	QueueHandle_t sender;
 	QueueHandle_t reciever;
+} Ack_t;
+
+typedef struct {
+	QueueHandle_t sender;
+	QueueHandle_t reciever;
 
 	SequenceNumber_t sequenceNumber;
 
@@ -288,11 +293,11 @@ int main(int argc, char* argv[])
 //	}
 
 	/** Creating Queues **/
-	Node1Queue = xQueueCreate(1, sizeof(packet));
-	Node2Queue = xQueueCreate(1, sizeof(packet));
-	Node3Queue = xQueueCreate(10, sizeof(packet));
-	Node4Queue = xQueueCreate(10, sizeof(packet));
-	RouterQueue = xQueueCreate(20, sizeof(packet));
+	Node1Queue = xQueueCreate(1, sizeof(Ack_t*));
+	Node2Queue = xQueueCreate(1, sizeof(Ack_t*));
+	Node3Queue = xQueueCreate(10, sizeof(packet*));
+	Node4Queue = xQueueCreate(10, sizeof(packet*));
+	RouterQueue = xQueueCreate(20, sizeof(packet*));
 
 	/** Creating Semaphores **/
 	Node1SendData = xSemaphoreCreateBinary();
