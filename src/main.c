@@ -481,11 +481,9 @@ void vRecieverTask(void *pvParameters)
 	SequenceNumber_t previousSequence1 = 0;
 	SequenceNumber_t previousSequence2 = 0;
 
-	NumOfPackets_t totalReceived1 = 0;
-	NumOfPackets_t totalReceived2 = 0;
-	NumOfPackets_t totalLost1 = 0;
-	NumOfPackets_t totalLost2 = 0;
+	static NumOfPackets_t totalReceived = 0;
 
+	static NumOfPackets_t totalLost = 0;
 
 	while(1)
 	{
@@ -512,17 +510,17 @@ void vRecieverTask(void *pvParameters)
 			switch(QueueHandleToNum(PacketRecieved->header.sender))
 			{
 			case 1:
-				totalReceived1++;
-				totalLost1 += PacketRecieved->header.sequenceNumber - previousSequence1 - 1;
+				totalReceived++;
+				totalLost += PacketRecieved->header.sequenceNumber - previousSequence1 - 1;
 				previousSequence1 = PacketRecieved->header.sequenceNumber;
-				trace_printf("Received: %d, Lost: %d", totalReceived1, totalLost1);
+				trace_printf("Received: %d, Lost: %d", totalReceived, totalLost);
 				break;
 
 			case 2:
-				totalReceived2++;
-				totalLost2 += PacketRecieved->header.sequenceNumber - previousSequence2 - 1;
+				totalReceived++;
+				totalLost += PacketRecieved->header.sequenceNumber - previousSequence2 - 1;
 				previousSequence2 = PacketRecieved->header.sequenceNumber;
-				trace_printf("Received: %d, Lost: %d\n\n", totalReceived2, totalLost2);
+				trace_printf("Received: %d, Lost: %d\n\n", totalReceived, totalLost);
 				break;
 			}
 
@@ -530,19 +528,14 @@ void vRecieverTask(void *pvParameters)
 			free(PacketRecieved);
 
 			// Suspend Current Task if it has received 2000 or more Packets
-			if((totalReceived1 + totalLost1 + totalReceived2 + totalLost2) >= MAX_NUM_OF_PACKETS)
+			if((totalReceived + totalLost) >= MAX_NUM_OF_PACKETS)
 			{
 				trace_printf("\n**Suspended Node %d...Printing Node Statistics....\n",
 										QueueHandleToNum(CurrentNode->CurrentQueue));
-				trace_printf("\nTotal Packets from 1: %d\n", totalReceived1 + totalLost1);
-				trace_printf("Total Received from 1: %d\n", totalReceived1);
-				trace_printf("Total Lost from 1: %d\n", totalLost1);
+				trace_printf("\nTotal Packets: %d\n", totalReceived + totalLost);
+				trace_printf("Total Received: %d\n", totalReceived);
+				trace_printf("Total Lost from: %d\n", totalLost);
 //				trace_printf("Lost \% %d", ((float)totalLost1/(totalReceived1 + totalLost1)) * 100);
-
-				trace_printf("\nTotal Packets from 2: %d\n", totalReceived2 + totalLost2);
-				trace_printf("Total Received from 2: %d\n", totalReceived2);
-				trace_printf("Total Lost from 2: %d\n", totalLost2);
-//				trace_printf("Lost \% %d", (uint32_t)((float)totalLost2 / (totalReceived2 + totalLost2)) * 100);
 
 				if(Finished)
 				{
