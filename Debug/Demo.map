@@ -5935,7 +5935,7 @@ END GROUP
 .debug_pubnames
  *(.debug_pubnames)
 
-.debug_info     0x0000000000000000     0xf441
+.debug_info     0x0000000000000000     0xf44e
  *(.debug_info .gnu.linkonce.wi.*)
  .debug_info    0x0000000000000000      0xa37 ./system/src/stm32f4-hal/stm32f4xx_hal.o
  .debug_info    0x0000000000000a37     0x1340 ./system/src/stm32f4-hal/stm32f4xx_hal_cortex.o
@@ -5952,14 +5952,14 @@ END GROUP
  .debug_info    0x0000000000006aae      0x53c ./system/src/cmsis/system_stm32f4xx.o
  .debug_info    0x0000000000006fea       0xce ./system/src/cmsis/vectors_stm32f407xx.o
  .debug_info    0x00000000000070b8      0x59b ./src/initialize-hardware.o
- .debug_info    0x0000000000007653     0x1546 ./src/main.o
- .debug_info    0x0000000000008b99       0xbf ./src/stm32f4xx_hal_msp.o
- .debug_info    0x0000000000008c58      0x4c8 ./FreeRTOS Source/portable/MemMang/heap_4.o
- .debug_info    0x0000000000009120      0x534 ./FreeRTOS Source/portable/GCC/ARM_CM4F/port.o
- .debug_info    0x0000000000009654      0x2d9 ./FreeRTOS Source/list.o
- .debug_info    0x000000000000992d     0x1cfd ./FreeRTOS Source/queue.o
- .debug_info    0x000000000000b62a     0x2c5c ./FreeRTOS Source/tasks.o
- .debug_info    0x000000000000e286     0x11bb ./FreeRTOS Source/timers.o
+ .debug_info    0x0000000000007653     0x1553 ./src/main.o
+ .debug_info    0x0000000000008ba6       0xbf ./src/stm32f4xx_hal_msp.o
+ .debug_info    0x0000000000008c65      0x4c8 ./FreeRTOS Source/portable/MemMang/heap_4.o
+ .debug_info    0x000000000000912d      0x534 ./FreeRTOS Source/portable/GCC/ARM_CM4F/port.o
+ .debug_info    0x0000000000009661      0x2d9 ./FreeRTOS Source/list.o
+ .debug_info    0x000000000000993a     0x1cfd ./FreeRTOS Source/queue.o
+ .debug_info    0x000000000000b637     0x2c5c ./FreeRTOS Source/tasks.o
+ .debug_info    0x000000000000e293     0x11bb ./FreeRTOS Source/timers.o
 
 .debug_abbrev   0x0000000000000000     0x2be5
  *(.debug_abbrev)
@@ -6066,7 +6066,7 @@ END GROUP
  .debug_frame   0x00000000000024a4       0x3c /home/osboxes/.local/xPacks/@xpack-dev-tools/arm-none-eabi-gcc/10.2.1-1.1.2/.content/bin/../lib/gcc/arm-none-eabi/10.2.1/../../../../arm-none-eabi/lib/thumb/v7e-m+fp/softfp/libg_nano.a(lib_a-nano-reallocr.o)
  .debug_frame   0x00000000000024e0       0x20 /home/osboxes/.local/xPacks/@xpack-dev-tools/arm-none-eabi-gcc/10.2.1-1.1.2/.content/bin/../lib/gcc/arm-none-eabi/10.2.1/../../../../arm-none-eabi/lib/thumb/v7e-m+fp/softfp/libg_nano.a(lib_a-nano-msizer.o)
 
-.debug_str      0x0000000000000000    0xff06c
+.debug_str      0x0000000000000000    0xff0cd
  *(.debug_str)
  .debug_str     0x0000000000000000    0xeebbb ./system/src/stm32f4-hal/stm32f4xx_hal.o
                                       0xeef50 (size before relaxing)
@@ -6098,21 +6098,21 @@ END GROUP
                                        0x3ce2 (size before relaxing)
  .debug_str     0x00000000000f7087       0x30 ./src/initialize-hardware.o
                                       0xf15ba (size before relaxing)
- .debug_str     0x00000000000f70b7     0x544c ./src/main.o
-                                       0xdeba (size before relaxing)
- .debug_str     0x00000000000fc503       0x3d ./src/stm32f4xx_hal_msp.o
+ .debug_str     0x00000000000f70b7     0x54ad ./src/main.o
+                                       0xdf1b (size before relaxing)
+ .debug_str     0x00000000000fc564       0x3d ./src/stm32f4xx_hal_msp.o
                                       0xee21a (size before relaxing)
- .debug_str     0x00000000000fc540      0x2af ./FreeRTOS Source/portable/MemMang/heap_4.o
+ .debug_str     0x00000000000fc5a1      0x2af ./FreeRTOS Source/portable/MemMang/heap_4.o
                                        0xa118 (size before relaxing)
- .debug_str     0x00000000000fc7ef      0x814 ./FreeRTOS Source/portable/GCC/ARM_CM4F/port.o
+ .debug_str     0x00000000000fc850      0x814 ./FreeRTOS Source/portable/GCC/ARM_CM4F/port.o
                                        0x7e23 (size before relaxing)
- .debug_str     0x00000000000fd003      0x125 ./FreeRTOS Source/list.o
+ .debug_str     0x00000000000fd064      0x125 ./FreeRTOS Source/list.o
                                        0x99bb (size before relaxing)
- .debug_str     0x00000000000fd128      0x848 ./FreeRTOS Source/queue.o
+ .debug_str     0x00000000000fd189      0x848 ./FreeRTOS Source/queue.o
                                        0xb144 (size before relaxing)
- .debug_str     0x00000000000fd970     0x1333 ./FreeRTOS Source/tasks.o
+ .debug_str     0x00000000000fd9d1     0x1333 ./FreeRTOS Source/tasks.o
                                        0xbec3 (size before relaxing)
- .debug_str     0x00000000000feca3      0x3c9 ./FreeRTOS Source/timers.o
+ .debug_str     0x00000000000fed04      0x3c9 ./FreeRTOS Source/timers.o
                                        0xb520 (size before relaxing)
 
 .debug_loc      0x0000000000000000     0x800b
@@ -6180,7 +6180,7 @@ LOAD linker stubs
  .debug_ranges  0x00000000000008d0      0x2d8 ./FreeRTOS Source/tasks.o
  .debug_ranges  0x0000000000000ba8       0xa8 ./FreeRTOS Source/timers.o
 
-.debug_macro    0x0000000000000000    0x2af35
+.debug_macro    0x0000000000000000    0x2af3b
  .debug_macro   0x0000000000000000      0x44c ./system/src/stm32f4-hal/stm32f4xx_hal.o
  .debug_macro   0x000000000000044c      0xa90 ./system/src/stm32f4-hal/stm32f4xx_hal.o
  .debug_macro   0x0000000000000edc      0x3a2 ./system/src/stm32f4-hal/stm32f4xx_hal.o
@@ -6334,24 +6334,24 @@ LOAD linker stubs
  .debug_macro   0x00000000000288f8      0x3f2 ./system/src/cmsis/system_stm32f4xx.o
  .debug_macro   0x0000000000028cea       0x73 ./system/src/cmsis/vectors_stm32f407xx.o
  .debug_macro   0x0000000000028d5d      0x507 ./src/initialize-hardware.o
- .debug_macro   0x0000000000029264      0x333 ./src/main.o
- .debug_macro   0x0000000000029597       0x16 ./src/main.o
- .debug_macro   0x00000000000295ad      0x115 ./src/main.o
- .debug_macro   0x00000000000296c2      0x168 ./src/main.o
- .debug_macro   0x000000000002982a       0xeb ./src/main.o
- .debug_macro   0x0000000000029915       0x10 ./src/main.o
- .debug_macro   0x0000000000029925       0x1f ./src/main.o
- .debug_macro   0x0000000000029944      0x3de ./src/main.o
- .debug_macro   0x0000000000029d22       0xc0 ./src/main.o
- .debug_macro   0x0000000000029de2       0x8c ./src/main.o
- .debug_macro   0x0000000000029e6e       0x94 ./src/main.o
- .debug_macro   0x0000000000029f02       0x91 ./src/main.o
- .debug_macro   0x0000000000029f93       0x78 ./src/main.o
- .debug_macro   0x000000000002a00b      0x3ec ./src/stm32f4xx_hal_msp.o
- .debug_macro   0x000000000002a3f7      0x1b0 ./FreeRTOS Source/portable/MemMang/heap_4.o
- .debug_macro   0x000000000002a5a7      0x1ae ./FreeRTOS Source/portable/GCC/ARM_CM4F/port.o
- .debug_macro   0x000000000002a755      0x189 ./FreeRTOS Source/list.o
- .debug_macro   0x000000000002a8de      0x20f ./FreeRTOS Source/queue.o
- .debug_macro   0x000000000002aaed      0x272 ./FreeRTOS Source/tasks.o
- .debug_macro   0x000000000002ad5f       0x10 ./FreeRTOS Source/tasks.o
- .debug_macro   0x000000000002ad6f      0x1c6 ./FreeRTOS Source/timers.o
+ .debug_macro   0x0000000000029264      0x339 ./src/main.o
+ .debug_macro   0x000000000002959d       0x16 ./src/main.o
+ .debug_macro   0x00000000000295b3      0x115 ./src/main.o
+ .debug_macro   0x00000000000296c8      0x168 ./src/main.o
+ .debug_macro   0x0000000000029830       0xeb ./src/main.o
+ .debug_macro   0x000000000002991b       0x10 ./src/main.o
+ .debug_macro   0x000000000002992b       0x1f ./src/main.o
+ .debug_macro   0x000000000002994a      0x3de ./src/main.o
+ .debug_macro   0x0000000000029d28       0xc0 ./src/main.o
+ .debug_macro   0x0000000000029de8       0x8c ./src/main.o
+ .debug_macro   0x0000000000029e74       0x94 ./src/main.o
+ .debug_macro   0x0000000000029f08       0x91 ./src/main.o
+ .debug_macro   0x0000000000029f99       0x78 ./src/main.o
+ .debug_macro   0x000000000002a011      0x3ec ./src/stm32f4xx_hal_msp.o
+ .debug_macro   0x000000000002a3fd      0x1b0 ./FreeRTOS Source/portable/MemMang/heap_4.o
+ .debug_macro   0x000000000002a5ad      0x1ae ./FreeRTOS Source/portable/GCC/ARM_CM4F/port.o
+ .debug_macro   0x000000000002a75b      0x189 ./FreeRTOS Source/list.o
+ .debug_macro   0x000000000002a8e4      0x20f ./FreeRTOS Source/queue.o
+ .debug_macro   0x000000000002aaf3      0x272 ./FreeRTOS Source/tasks.o
+ .debug_macro   0x000000000002ad65       0x10 ./FreeRTOS Source/tasks.o
+ .debug_macro   0x000000000002ad75      0x1c6 ./FreeRTOS Source/timers.o

@@ -95,6 +95,8 @@ typedef struct {
 	SequenceNumber_t sequenceNumber;
 
 	uint16_t length;
+
+	uint16_t padding;	// To make sure the header 16 bytes
 } header_t;
 
 typedef struct {
