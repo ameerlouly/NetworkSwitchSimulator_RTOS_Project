@@ -477,6 +477,7 @@ void vRecieverTask(void *pvParameters)
 	BaseType_t status = pdFAIL;
 
 	QueueHandle_t SenderQueue = NULL;
+	QueueHandle_t RecieverQueue = NULL;
 	SequenceNumber_t CurrentSequence = 0;
 
 	static uint8_t Finished = 0;
@@ -497,19 +498,23 @@ void vRecieverTask(void *pvParameters)
 		{
 			continue;
 		}
-		
+
 		SenderQueue = PacketRecieved->header.sender;
+		RecieverQueue = PacketRecieved->header.reciever;
 		CurrentSequence = PacketRecieved->header.sequenceNumber;
 
+		free(PacketRecieved->data);
+		free(PacketRecieved);
+
 		// Checks if the Received Packets are meant for the Current Node
-		if(PacketRecieved->header.reciever != CurrentNode->CurrentQueue)
+		if(RecieverQueue != CurrentNode->CurrentQueue)
 		{
 			WrongPackets++;
 			free(PacketRecieved->data);
 			free(PacketRecieved);
 			continue;
 		}
-		else if(PacketRecieved->header.reciever == CurrentNode->CurrentQueue)
+		else if(RecieverQueue == CurrentNode->CurrentQueue)
 		{
 			trace_printf("\n\nNode %d: Received %d from %d No #%d\n", QueueHandleToNum(CurrentNode->CurrentQueue),
 																  PacketRecieved->header.length,
@@ -517,19 +522,19 @@ void vRecieverTask(void *pvParameters)
 																  PacketRecieved->header.sequenceNumber);
 
 					/** Handle Sequence Numbers and Count Lost Packets**/
-			switch(QueueHandleToNum(PacketRecieved->header.sender))
+			switch(QueueHandleToNum(SenderQueue))
 			{
 			case 1:
 				totalReceived++;
-				totalLost += PacketRecieved->header.sequenceNumber - previousSequence1 - 1;
-				previousSequence1 = PacketRecieved->header.sequenceNumber;
+				totalLost += CurrentSequence - previousSequence1 - 1;
+				previousSequence1 = CurrentSequence;
 				trace_printf("Received: %d, Lost: %d", totalReceived, totalLost);
 				break;
 
 			case 2:
 				totalReceived++;
-				totalLost += PacketRecieved->header.sequenceNumber - previousSequence2 - 1;
-				previousSequence2 = PacketRecieved->header.sequenceNumber;
+				totalLost += CurrentSequence - previousSequence2 - 1;
+				previousSequence2 = CurrentSequence;
 				trace_printf("Received: %d, Lost: %d\n\n", totalReceived, totalLost);
 				break;
 			}
