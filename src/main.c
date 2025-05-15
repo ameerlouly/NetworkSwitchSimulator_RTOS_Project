@@ -321,11 +321,11 @@ int main(int argc, char* argv[])
 	/** Node Types Definitions ****************************************************/
 
 //					   {Task Handle, Queue Handle, SenderTimer, ACKTout Timer, SendData Semaphore}
-	NodeType_t Node1 = {&Node1Task, Node1Queue, tNode1_Sender, NULL,Node1SendData};
-	NodeType_t Node2 = {&Node2Task, Node2Queue, tNode2_Sender, NULL, Node2SendData};
-	NodeType_t Node3 = {&Node3Task, Node3Queue, NULL, NULL, NULL};
-	NodeType_t Node4 = {&Node4Task, Node4Queue, NULL, NULL, NULL};
-	NodeType_t Router = {&RouterTask, RouterQueue, tRouterDelay, NULL, RouterTransmit};
+	NodeType_t Node1 = {Node1Task, Node1Queue, tNode1_Sender, NULL,Node1SendData};
+	NodeType_t Node2 = {Node2Task, Node2Queue, tNode2_Sender, NULL, Node2SendData};
+	NodeType_t Node3 = {Node3Task, Node3Queue, NULL, NULL, NULL};
+	NodeType_t Node4 = {Node4Task, Node4Queue, NULL, NULL, NULL};
+	NodeType_t Router = {RouterTask, RouterQueue, tRouterDelay, NULL, RouterTransmit};
 
 	/** End of Node Types Definitions *********************************************/
 	if(		Node1Queue != NULL &&
@@ -479,6 +479,7 @@ void vRecieverTask(void *pvParameters)
 	QueueHandle_t SenderQueue = NULL;
 	QueueHandle_t RecieverQueue = NULL;
 	SequenceNumber_t CurrentSequence = 0;
+	uint16_t ReceivedLength = 0;
 
 	static uint8_t Finished = 0;
 
@@ -493,7 +494,7 @@ void vRecieverTask(void *pvParameters)
 
 	while(1)
 	{
-		status = xQueueReceive(CurrentNode->CurrentQueue, &PacketRecieved, 0);
+		status = xQueueReceive(CurrentNode->CurrentQueue, &PacketRecieved, pdMS_TO_TICKS(5));
 		if(status != pdPASS)
 		{
 			continue;
@@ -502,6 +503,8 @@ void vRecieverTask(void *pvParameters)
 		SenderQueue = PacketRecieved->header.sender;
 		RecieverQueue = PacketRecieved->header.reciever;
 		CurrentSequence = PacketRecieved->header.sequenceNumber;
+		ReceivedLength = PacketRecieved->header.length;
+		ReceivedLength -= sizeof(header_t);
 
 		free(PacketRecieved->data);
 		free(PacketRecieved);
@@ -517,9 +520,9 @@ void vRecieverTask(void *pvParameters)
 		else if(RecieverQueue == CurrentNode->CurrentQueue)
 		{
 			trace_printf("\n\nNode %d: Received %d from %d No #%d\n", QueueHandleToNum(CurrentNode->CurrentQueue),
-																  PacketRecieved->header.length,
-																  QueueHandleToNum(PacketRecieved->header.sender),
-																  PacketRecieved->header.sequenceNumber);
+																  ReceivedLength,
+																  QueueHandleToNum(SenderQueue),
+																  CurrentSequence);
 
 					/** Handle Sequence Numbers and Count Lost Packets**/
 			switch(QueueHandleToNum(SenderQueue))
@@ -559,7 +562,7 @@ void vRecieverTask(void *pvParameters)
 
 //				vTaskSuspend(CurrentNode->CurrentTask);
 				Finished = 1;
-				xSemaphoreTake(StopTransmission, portMAX_DELAY); // Blocks Task
+				vTaskSuspend(CurrentNode->CurrentTask); // Suspends Task
 			}
 
 //?			/**  ACK Part (Commented Out for Phase 1)	**/
@@ -577,7 +580,7 @@ void vRecieverTask(void *pvParameters)
 		else
 		{
 			trace_printf("\n\nNode %d: Received Wrong Packet from %d\n", QueueHandleToNum(CurrentNode->CurrentQueue),
-														   QueueHandleToNum(PacketRecieved->header.sender));
+														   QueueHandleToNum(SenderQueue));
 			free(PacketRecieved->data);
 			free(PacketRecieved);
 		}
@@ -587,6 +590,7 @@ void vRecieverTask(void *pvParameters)
 
 void vRouterTask(void *pvParameters)
 {
+	trace_puts("Beginning of Router Task");
 	NodeType_t *CurrentNode = (NodeType_t*)pvParameters;
 
 	packet* PacketRecieved = NULL;	// Buffer to Process Received Packets
