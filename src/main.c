@@ -71,7 +71,7 @@
 #define ACK_PACKET 				(uint32_t)2001
 #define NUM_OF_TRIES 			(uint8_t)4
 #define PACKET_SENT				(uint8_t)1
-#define MAX_NUM_OF_PACKETS		(uint16_t)2000
+#define MAX_NUM_OF_PACKETS		(uint16_t)4000
 
 /** End of Macros *************************************************************/
 
@@ -542,7 +542,8 @@ void vRecieverTask(void *pvParameters)
 				trace_printf("\n**SYSTEM SUSPENDED...PRINTING STATISTICS....\n");
 				trace_printf("\nTotal Packets: %d\n", totalReceived + totalLost);
 				trace_printf("Total Received: %d\n", totalReceived);
-				trace_printf("Total Lost: %d\n", totalLost - WrongPackets);
+				trace_printf("Total Lost: %d\n", totalLost);
+				trace_printf("Total Dropped: %d\n", totalLost - WrongPackets);
 //				trace_printf("Lost \% %d", ((float)totalLost1/(totalReceived1 + totalLost1)) * 100);
 				trace_printf("Diverted Packets: %d\n", WrongPackets);
 				vTaskSuspendAll(); // Suspends Task
