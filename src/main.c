@@ -481,8 +481,6 @@ void vRecieverTask(void *pvParameters)
 	SequenceNumber_t CurrentSequence = 0;
 	uint16_t ReceivedLength = 0;
 
-	static uint8_t Finished = 0;
-
 	static NumOfError_t WrongPackets = 0;
 
 	SequenceNumber_t previousSequence1 = 0;
