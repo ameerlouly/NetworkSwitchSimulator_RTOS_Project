@@ -116,8 +116,8 @@ typedef struct {
 
 /** Project Parameters *********************************************************/
 
-#define T1 					( pdMS_TO_TICKS(200) )
-#define T2 					( pdMS_TO_TICKS(500) )
+#define T1 					( pdMS_TO_TICKS(100) )
+#define T2 					( pdMS_TO_TICKS(200) )
 #define Tout 				( pdMS_TO_TICKS(200) )
 #define Pdrop 				( (double)0.01 )
 #define P_WRONG_PACKET		( (double)0.005 )
