@@ -447,9 +447,13 @@ void vSenderTask(void *pvParameters)
 		for(int i = 0; i < NUM_OF_TRIES; i++)
 		{
 			 status = xQueueReceive(CurrentNode->CurrentQueue, &PacketRecieved, Tout);
-			 if(status == pdPASS)
+			 if(status == pdPASS && (PacketToSend->header.sequenceNumber == PacketRecieved->header.sequenceNumber))
 			 {
-			 	trace_printf("***Node %d Received ACK***\n", QueueHandleToNum(CurrentNode->CurrentQueue));
+			 	// Display Recieved Packets
+				trace_printf("\n\n***Node %d: Received ACK from %d to %d No #%d\n", QueueHandleToNum(CurrentNode->CurrentQueue),
+																				    QueueHandleToNum(PacketRecieved->header.sender),
+																				    QueueHandleToNum(PacketRecieved->header.reciever),
+																				    PacketRecieved->header.sequenceNumber);
 				free(PacketToSend->data);
 				free(PacketToSend);
 				free(PacketRecieved->data);
@@ -458,7 +462,9 @@ void vSenderTask(void *pvParameters)
 			 }
 			 else
 			 {
-			 	trace_printf("Node %d Awaiting ACK\n", QueueHandleToNum(CurrentNode->CurrentQueue));
+			 	trace_printf("Node %d: Awaiting ACK from %d No #%d\n", QueueHandleToNum(CurrentNode->CurrentQueue),
+																	   QueueHandleToNum(PacketToSend->header.reciever),
+																	   QueueHandleToNum(PacketToSend->header.sequenceNumber));
 			 	xQueueSend(RouterQueue, &PacketToSend, 0);
 			 }
 		}
