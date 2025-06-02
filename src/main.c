@@ -122,8 +122,9 @@ typedef struct {
 #define Pdrop 				( (double)0.01 )
 #define P_WRONG_PACKET		( (double)0.005 )
 #define Tdelay				( pdMS_TO_TICKS(200) )
-static const uint32_t	L1 = 1000;
-static const uint32_t	L2 = 2000;
+#define K					( (uinit32_t)40 )
+static const uint32_t	L1 = 500;
+static const uint32_t	L2 = 1500;
 
 /** End of Project Parameters *************************************************/
 
@@ -377,14 +378,15 @@ void vSenderTask(void *pvParameters)
 	trace_puts("Beginning of Sender Task");
 	NodeType_t *CurrentNode = (NodeType_t*)pvParameters;	// Set Parameters
 
-	packet* PacketToSend = NULL;
+	packet* PacketToSend = NULL;	// Packet to store packet to send
 	uint16_t SequenceToNode3 = 0;
 	uint16_t SequenceToNode4 = 0;
 
 	uint8_t RecieverNum = 3;
+
 //?		/** Used for ACK Part (Commented Out for Phase 1)	**/
-//	packet* PacketRecieved = NULL; // Buffer to store recieved ACK Packets
-//	BaseType_t status;
+	packet* PacketRecieved = NULL; // Buffer to store recieved ACK Packets
+	BaseType_t status;
 
 	if(CurrentNode->CurrentTask == Node1Task)
 	{
@@ -440,33 +442,38 @@ void vSenderTask(void *pvParameters)
 		xQueueSend(RouterQueue, &PacketToSend, portMAX_DELAY);
 
 
-//?				/** ACK Part (Commented Out for Phase 1)	**/
-//		for(int i = 0; i < NUM_OF_TRIES; i++)
-//		{
-//			 status = xQueueReceive(CurrentNode->CurrentQueue, &PacketRecieved, Tout);
-//			 if(status == pdPASS)
-//			 {
-//			 	trace_printf("***Node %d Received ACK***\n", QueueHandleToNum(CurrentNode->CurrentQueue));
-//			 	break;
-//			 }
-//			 else
-//			 {
-//			 	trace_printf("Node %d Awaiting ACK\n", QueueHandleToNum(CurrentNode->CurrentQueue));
-//			 	xQueueSend(RouterQueue, &PacketToSend, 0);
-//			 }
-//		}
-//
-//		 if(status == pdPASS)
-//		 {
-//		 	trace_puts("Packet Sent Successfully, Sending Next Packet!");
-//		 }
-//		 else
-//		 {
-//		 	trace_printf("Node %d Did not receive ACK\n", QueueHandleToNum(CurrentNode->CurrentQueue));
-//		 	free(PacketToSend);
-//		 }
-//
-//		 free(PacketRecieved);
+//?				/** ACK Part **/
+		for(int i = 0; i < NUM_OF_TRIES; i++)
+		{
+			 status = xQueueReceive(CurrentNode->CurrentQueue, &PacketRecieved, Tout);
+			 if(status == pdPASS)
+			 {
+			 	trace_printf("***Node %d Received ACK***\n", QueueHandleToNum(CurrentNode->CurrentQueue));
+				free(PacketToSend->data);
+				free(PacketToSend);
+				free(PacketRecieved->data);
+				free(PacketRecieved);
+			 	break;
+			 }
+			 else
+			 {
+			 	trace_printf("Node %d Awaiting ACK\n", QueueHandleToNum(CurrentNode->CurrentQueue));
+			 	xQueueSend(RouterQueue, &PacketToSend, 0);
+			 }
+		}
+
+		 if(status == pdPASS)
+		 {
+		 	trace_puts("Packet Sent Successfully, Sending Next Packet!");
+		 }
+		 else
+		 {
+		 	trace_printf("Node %d Did not receive ACK\n", QueueHandleToNum(CurrentNode->CurrentQueue));
+			free(PacketToSend->data);
+		 	free(PacketToSend);
+		 }
+
+		 free(PacketRecieved);
 	}
 }
 
@@ -477,12 +484,14 @@ void vRecieverTask(void *pvParameters)
 	packet* PacketRecieved = NULL;		// Buffer to Store Received Packets
 //	packet* PacketToSend = NULL;	// Buffer to Store ACKs
 
+	packet* PacketToSend = NULL;
+
 	BaseType_t status = pdFAIL;
 
-	QueueHandle_t SenderQueue = NULL;
-	QueueHandle_t RecieverQueue = NULL;
-	SequenceNumber_t CurrentSequence = 0;
-	uint16_t ReceivedLength = 0;
+	// QueueHandle_t SenderQueue = NULL;
+	// QueueHandle_t RecieverQueue = NULL;
+	// SequenceNumber_t CurrentSequence = 0;
+	// uint16_t ReceivedLength = 0;
 
 	static NumOfError_t WrongPackets = 0;
 
@@ -501,75 +510,77 @@ void vRecieverTask(void *pvParameters)
 			continue;
 		}
 
-		SenderQueue = PacketRecieved->header.sender;
-		RecieverQueue = PacketRecieved->header.reciever;
-		CurrentSequence = PacketRecieved->header.sequenceNumber;
-		ReceivedLength = PacketRecieved->header.length;
-		ReceivedLength -= sizeof(header_t);
+		// SenderQueue = PacketRecieved->header.sender;
+		// RecieverQueue = PacketRecieved->header.reciever;
+		// CurrentSequence = PacketRecieved->header.sequenceNumber;
+		// ReceivedLength = PacketRecieved->header.length;
+		// ReceivedLength -= sizeof(header_t);
 
-		free(PacketRecieved->data);
-		free(PacketRecieved);
+		// free(PacketRecieved->data);
+		// free(PacketRecieved);
 
+		// Display Recieved Packets
 		trace_printf("\n\nNode %d: Received %d from %d to %d No #%d\n", QueueHandleToNum(CurrentNode->CurrentQueue),
-																  	  	ReceivedLength,
-																  	  	QueueHandleToNum(SenderQueue),
-																	  	QueueHandleToNum(RecieverQueue),
-																  	  	CurrentSequence);
+																  	  	PacketRecieved->header.length,
+																  	  	QueueHandleToNum(PacketRecieved->header.sender),
+																	  	QueueHandleToNum(PacketRecieved->header.reciever),
+																  	  	PacketRecieved->header.sequenceNumber);
 
 		// Checks if the Received Packets are meant for the Current Node
-		if(QueueHandleToNum(RecieverQueue) == QueueHandleToNum(CurrentNode->CurrentQueue))
+		if(QueueHandleToNum(PacketRecieved->header.reciever) == QueueHandleToNum(CurrentNode->CurrentQueue))
 		{
 					/** Handle Sequence Numbers and Count Lost Packets**/
-			switch(QueueHandleToNum(SenderQueue))
+			switch(QueueHandleToNum(PacketRecieved->header.sender))
 			{
 			case 1:
-				totalLost += CurrentSequence - previousSequence1 - 1;
-				previousSequence1 = CurrentSequence;
+				totalLost += PacketRecieved->header.sequenceNumber - previousSequence1 - 1;
+				previousSequence1 = PacketRecieved->header.sequenceNumber;
 				break;
 
 			case 2:
-				totalLost += CurrentSequence - previousSequence2 - 1;
-				previousSequence2 = CurrentSequence;
+				totalLost += PacketRecieved->header.sequenceNumber - previousSequence2 - 1;
+				previousSequence2 = PacketRecieved->header.sequenceNumber;
 				break;
 			}
 
-			totalReceived++;
-			trace_printf("Received: %d, Lost: %d, Diverted: %d\n\n", totalReceived, totalLost, WrongPackets);
+// 			// Statistics Purposes
+// 			totalReceived++;
+// 			trace_printf("Received: %d, Lost: %d, Diverted: %d\n\n", totalReceived, totalLost, WrongPackets);
 
-			free(PacketRecieved->data);
-			free(PacketRecieved);
+// 			free(PacketRecieved->data);
+// 			free(PacketRecieved);
 
-			// Suspend Current Task if it has received 2000 or more Packets
-			if((totalReceived + totalLost) >= MAX_NUM_OF_PACKETS)
-			{
-				trace_printf("\n**SYSTEM SUSPENDED...PRINTING STATISTICS....\n");
-				trace_printf("\nTotal Packets: %d\n", totalReceived + totalLost);
-				trace_printf("Total Received: %d\n", totalReceived);
-				trace_printf("Total Lost: %d\n", totalLost);
-				trace_printf("Total Dropped: %d\n", totalLost - WrongPackets);
-//				trace_printf("Lost \% %d", ((float)totalLost1/(totalReceived1 + totalLost1)) * 100);
-				trace_printf("Diverted Packets: %d\n", WrongPackets);
-				vTaskSuspendAll(); // Suspends Task
-			}
+// 			// Suspend Current Task if it has received 2000 or more Packets
+// 			if((totalReceived + totalLost) >= MAX_NUM_OF_PACKETS)
+// 			{
+// 				trace_printf("\n**SYSTEM SUSPENDED...PRINTING STATISTICS....\n");
+// 				trace_printf("\nTotal Packets: %d\n", totalReceived + totalLost);
+// 				trace_printf("Total Received: %d\n", totalReceived);
+// 				trace_printf("Total Lost: %d\n", totalLost);
+// 				trace_printf("Total Dropped: %d\n", totalLost - WrongPackets);
+// //				trace_printf("Lost \% %d", ((float)totalLost1/(totalReceived1 + totalLost1)) * 100);
+// 				trace_printf("Diverted Packets: %d\n", WrongPackets);
+// 				vTaskSuspendAll(); // Suspends Task
+// 			}
 
 //?			/**  ACK Part (Commented Out for Phase 1)	**/
-//			PacketToSend = malloc(sizeof(packet));
-//
-//			trace_printf("Received %d from Node %d", PacketRecieved->data,
-//													  QueueHandleToNum(PacketRecieved->sender));
-//			PacketToSend->sender = PacketRecieved->reciever;
-//			PacketToSend->reciever = PacketRecieved->sender;
-//			PacketToSend->data = ACK_PACKET;
-//			free(PacketRecieved);
-//
-//			xQueueSend(RouterQueue, &PacketToSend, 0); // Send ACK
+			PacketToSend = malloc(sizeof(packet));
+
+			// trace_printf("Received %d from Node %d", PacketRecieved->data,
+			// 										  QueueHandleToNum(PacketRecieved->sender));
+			PacketToSend->header.sender = PacketRecieved->header.reciever;
+			PacketToSend->header.reciever = PacketRecieved->header.sender;
+			PacketToSend->header.length = K;
+			PacketToSend->data = calloc(PacketToSend->header.length - sizeof(header_t), sizeof(Payload_t));
+
+			xQueueSend(RouterQueue, &PacketToSend, 0); // Send ACK
 		}
 		else
 		{
 			trace_printf("\n\nNode %d: Received Wrong Packet from %d\n", QueueHandleToNum(CurrentNode->CurrentQueue),
-														   				 QueueHandleToNum(SenderQueue));
-			free(PacketRecieved->data);
-			free(PacketRecieved);
+														   				 QueueHandleToNum(PacketRecieved->header.sender));
+			// free(PacketRecieved->data);
+			// free(PacketRecieved);
 			WrongPackets++;
 		}
 	}
