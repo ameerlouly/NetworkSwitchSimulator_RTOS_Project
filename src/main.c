@@ -120,6 +120,7 @@ typedef struct {
 #define T2 					( pdMS_TO_TICKS(200) )
 #define Tout 				( pdMS_TO_TICKS(200) )
 #define Pdrop 				( (double)0.01 )
+#define P_ack 				( (double)0.01 )
 #define P_WRONG_PACKET		( (double)0.005 )
 #define Tdelay				( pdMS_TO_TICKS(200) )
 #define D					( pdMS_TO_TICKS(5) )
@@ -384,9 +385,7 @@ void vSenderTask(void *pvParameters)
 	uint16_t SequenceToNode3 = 0;
 	uint16_t SequenceToNode4 = 0;
 
-	uint8_t RecieverNum = 3;
-
-//?		/** Used for ACK Part (Commented Out for Phase 1)	**/
+//?		/** Used for ACK Part **/
 	packet* PacketRecieved = NULL; // Buffer to store recieved ACK Packets
 	BaseType_t status;
 
@@ -427,10 +426,7 @@ void vSenderTask(void *pvParameters)
 
 		PacketToSend->header.sender = CurrentNode->CurrentQueue;
 
-
-		RecieverNum = RandomNum(3, 4);
-
-		switch(RecieverNum)
+		switch(RandomNum(3, 4))
 		{
 		case 3:
 			PacketToSend->header.reciever = Node3Queue;
@@ -573,6 +569,14 @@ void vRecieverTask(void *pvParameters)
 			xSemaphoreTake(GeneratePacket, portMAX_DELAY);
 
 			PacketToSend = malloc(sizeof(packet));
+			if(PacketToSend == NULL)
+			{
+				// Failed to Generate Packet, Trying Again
+				trace_puts("Failed to Allocate ACK");
+				free(PacketToSend->data);
+				free(PacketToSend);
+				continue;
+			}
 
 			// trace_printf("Received %d from Node %d", PacketRecieved->data,
 			// 										  QueueHandleToNum(PacketRecieved->sender));
@@ -580,6 +584,14 @@ void vRecieverTask(void *pvParameters)
 			PacketToSend->header.reciever = PacketRecieved->header.sender;
 			PacketToSend->header.length = K;
 			PacketToSend->data = calloc(PacketToSend->header.length - sizeof(header_t), sizeof(Payload_t));
+			if(PacketToSend->data == NULL)
+			{
+				// Failed to Generate Packet, Trying Again
+				trace_puts("Failed to Allocate ACK Data");
+				free(PacketToSend->data);
+				free(PacketToSend);
+				continue;
+			}
 
 			xSemaphoreGive(GeneratePacket);
 
@@ -619,6 +631,15 @@ void vRouterTask(void *pvParameters)
 //		{
 //			trace_printf("Content: %d\n", PacketRecieved->data);
 //		}
+		if(PacketRecieved->header.length == K)
+		{
+			if(checkProb(P_ack) == pdTRUE)
+			{
+				free(PacketRecieved->data);
+				free(PacketRecieved);
+				trace_printf("\n\nRouter Dropped ACK...\n");
+			}
+		}
 
 		if(checkProb(Pdrop) == pdTRUE)
 		{
@@ -643,6 +664,7 @@ void vRouterTask(void *pvParameters)
 		{
 //			vTaskDelay(Tdelay); // Delay Packet after making sure its forwarded //! Redacted, Using a Timer instead
 			xTimerStart(CurrentNode->CurrentTimer, 0);
+			xTimerChangePeriod(CurrentNode->CurrentTimer, ((PacketRecieved->header.length * 8.0) / C), 0);
 			xSemaphoreTake(CurrentNode->SendDataSema, portMAX_DELAY);
 
 			if(xQueueSend(PacketRecieved->header.reciever, &PacketRecieved, 0) != pdPASS)
@@ -676,7 +698,7 @@ void vSenderTimerCallBack(TimerHandle_t xTimer)
 		break;
 	}
 
-//	xTimerChangePeriodFromISR(xTimer, RandomNum(T1,T2), &xHigherPriorityTaskWoken);
+	xTimerChangePeriodFromISR(xTimer, RandomNum(T1,T2), &xHigherPriorityTaskWoken);
 
 	if(xHigherPriorityTaskWoken)
 	{
