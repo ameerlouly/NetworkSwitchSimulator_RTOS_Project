@@ -33,6 +33,7 @@
 #include <stdint.h>
 #include <time.h> // used by rand()
 #include <assert.h>
+#include <string.h>
 
 /* Kernel includes. */
 #include "FreeRTOS.h"
@@ -157,7 +158,7 @@ SemaphoreHandle_t Node2SendData;
 
 SemaphoreHandle_t RouterTransmit;
 
-SemaphoreHandle_t PrepareACK;
+SemaphoreHandle_t HandleToNum;
 
 SemaphoreHandle_t GeneratePacket;
 
@@ -304,7 +305,7 @@ int main(int argc, char* argv[])
 	Node2Queue = xQueueCreate(10, sizeof(packet*));
 	Node3Queue = xQueueCreate(10, sizeof(packet*));
 	Node4Queue = xQueueCreate(10, sizeof(packet*));
-	RouterQueue = xQueueCreate(20, sizeof(packet*));
+	RouterQueue = xQueueCreate(30, sizeof(packet*));
 
 	/** Creating Semaphores **/
 	Node1SendData = xSemaphoreCreateBinary();
@@ -313,8 +314,8 @@ int main(int argc, char* argv[])
 	Node2SendData = xSemaphoreCreateBinary();
 	xSemaphoreTake(Node2SendData, 0);
 
-	PrepareACK = xSemaphoreCreateMutex();
-	xSemaphoreGive(PrepareACK);
+	HandleToNum = xSemaphoreCreateMutex();
+	xSemaphoreGive(HandleToNum);
 
 	RouterTransmit = xSemaphoreCreateBinary();
 	xSemaphoreTake(RouterTransmit, 0);
@@ -342,8 +343,8 @@ int main(int argc, char* argv[])
 			RouterQueue != NULL)	// Check if Queue Creation was successful
 	{
 		// Creating Tasks
-		status = xTaskCreate(vSenderTask, "Node 1", 512, (void*)&Node1, 1, &Node1Task);
-		status &= xTaskCreate(vSenderTask, "Node 2", 512, (void*)&Node2, 1, &Node2Task);
+		status = xTaskCreate(vSenderTask, "Node 1", 1024, (void*)&Node1, 1, &Node1Task);
+		status &= xTaskCreate(vSenderTask, "Node 2", 1024, (void*)&Node2, 1, &Node2Task);
 		status &= xTaskCreate(vRecieverTask, "Node 3", 512, (void*)&Node3, 2, &Node3Task);
 		status &= xTaskCreate(vRecieverTask, "Node 4", 512, (void*)&Node4, 2, &Node4Task);
 		status &= xTaskCreate(vRouterTask, "Router", 512, (void*)&Router, 3, &RouterTask);
@@ -382,6 +383,7 @@ void vSenderTask(void *pvParameters)
 	NodeType_t *CurrentNode = (NodeType_t*)pvParameters;	// Set Parameters
 
 	packet* PacketToSend = NULL;	// Packet to store packet to send
+	packet* PacketBackup = NULL;
 	uint16_t SequenceToNode3 = 0;
 	uint16_t SequenceToNode4 = 0;
 	uint16_t CurrentSequence = 0;
@@ -390,10 +392,7 @@ void vSenderTask(void *pvParameters)
 	packet* PacketRecieved = NULL; // Buffer to store recieved ACK Packets
 	BaseType_t status;
 
-	static uint16_t TotalSent = 0;
-	static uint16_t TotalACKs = 0;
-
-	if(CurrentNode->CurrentTask == Node1Task)
+	if(CurrentNode->CurrentTask == Node2Task)
 	{
 		vTaskDelay(pdMS_TO_TICKS(20)); // Small delay so that both tasks dont start at the same time
 	}
@@ -408,13 +407,11 @@ void vSenderTask(void *pvParameters)
 
 		xSemaphoreTake(GeneratePacket, portMAX_DELAY);
 
-		PacketToSend = malloc(sizeof(packet));
+		PacketToSend = pvPortMalloc(sizeof(packet));
 		if(PacketToSend == NULL)
 		{
 			// Failed to Generate Packet, Trying Again
 			trace_puts("Failed to Allocate Packet");
-			free(PacketToSend->data);
-			free(PacketToSend);
 			continue;
 		}
 
@@ -440,11 +437,21 @@ void vSenderTask(void *pvParameters)
 		{
 			trace_puts("Failed to allocate data");
 			free(PacketToSend->data);
-			free(PacketToSend);
+			vPortFree(PacketToSend);
 			continue;
 		}
 
-		xSemaphoreGive(GeneratePacket);
+
+			/* Store A Backup of the Data transmitted in case of retransmission */
+		PacketBackup = malloc(sizeof(packet));
+		PacketBackup->data = calloc(PacketToSend->header.length - sizeof(header_t), sizeof(Payload_t));
+		strcpy(PacketBackup->data, PacketToSend->data);
+		PacketBackup->header = PacketToSend->header;
+
+//		PacketBackup->header.length = PacketToSend->header.length;
+//		PacketBackup->header.sequenceNumber = PacketToSend->header.sequenceNumber;
+//		PacketBackup->header.sender = PacketToSend->header.sender;
+//		PacketBackup->header.reciever = PacketToSend->header.reciever;
 
 		trace_printf("Node %d: Sending %d to %d No #%d\n", QueueHandleToNum(CurrentNode->CurrentQueue),
 														 PacketToSend->header.length,
@@ -452,44 +459,80 @@ void vSenderTask(void *pvParameters)
 														 CurrentSequence);
 		xQueueSend(RouterQueue, &PacketToSend, portMAX_DELAY);
 
+		xSemaphoreGive(GeneratePacket);
 
 //?				/** ACK Part **/
-		// for(int i = 0; i < NUM_OF_TRIES; i++)
-		// {
-		// 	 status = xQueueReceive(CurrentNode->CurrentQueue, &PacketRecieved, Tout);
-		// 	 if(status == pdPASS && (CurrentSequence == PacketRecieved->header.sequenceNumber))
-		// 	 {
-		// 	 	// Display Recieved Packets
-		// 		trace_printf("\n\n***Node %d: Received ACK from %d to %d No #%d\n", QueueHandleToNum(CurrentNode->CurrentQueue),
-		// 																		    QueueHandleToNum(PacketRecieved->header.sender),
-		// 																		    QueueHandleToNum(PacketRecieved->header.reciever),
-		// 																		    PacketRecieved->header.sequenceNumber);
-		// 		free(PacketToSend->data);
-		// 		free(PacketToSend);
-		// 		free(PacketRecieved->data);
-		// 		free(PacketRecieved);
-		// 	 	break;
-		// 	 }
-		// 	 else
-		// 	 {
-		// 	 	trace_printf("Node %d: Awaiting ACK from %d No #%i, Attempt #%d\n", QueueHandleToNum(CurrentNode->CurrentQueue),
-		// 															   QueueHandleToNum(PacketToSend->header.reciever),
-		// 															   CurrentSequence,
-		// 															   i);
-		// 	 	xQueueSend(RouterQueue, &PacketToSend, portMAX_DELAY);
-		// 	 }
-		// }
+		uint8_t ACK_recieved = 0;
+		for(int i = 0; i < NUM_OF_TRIES; i++)
+		{
+			 status = xQueueReceive(CurrentNode->CurrentQueue, &PacketRecieved, Tout);
+			 if(status == pdPASS)
+			 {
+			 	switch(QueueHandleToNum(PacketRecieved->header.sender))
+				{
+					case 3:
+					if(PacketRecieved->header.sequenceNumber == SequenceToNode3)
+					{
+						ACK_recieved = 1;
+					}
+					break;
+					
+					case 4:
+					if(PacketRecieved->header.sequenceNumber == SequenceToNode3)
+					{
+						ACK_recieved = 1;
+					}
+					break;
+				}
 
-		//  if(status == pdPASS && (PacketToSend->header.sequenceNumber == PacketRecieved->header.sequenceNumber))
-		//  {
-		//  	trace_puts("Packet Sent Successfully, Sending Next Packet!");
-		//  }
-		//  else
-		//  {
-		//  	trace_printf("Node %d Did not receive ACK, Skipping Packet...\n", QueueHandleToNum(CurrentNode->CurrentQueue));
-		// 	free(PacketToSend->data);
-		//  	free(PacketToSend);
-		//  }
+				if(ACK_recieved)
+				{
+					break;
+				}
+			 }
+			 else
+			 {
+			 	trace_printf("Node %d: Awaiting ACK from %d No #%i, Attempt #%d\n", QueueHandleToNum(CurrentNode->CurrentQueue),
+																	   QueueHandleToNum(PacketBackup->header.reciever),
+																	   CurrentSequence,
+																	   i + 1);
+			 	xQueueSend(RouterQueue, &PacketBackup, portMAX_DELAY);
+			 }
+		}
+
+		 if(ACK_recieved == 1)
+		 {
+			// Display Received Packets
+				trace_printf("\n\n***Node %d: Received ACK from %d to %d No #%d\n", QueueHandleToNum(CurrentNode->CurrentQueue),
+																				    QueueHandleToNum(PacketRecieved->header.sender),
+																				    QueueHandleToNum(PacketRecieved->header.reciever),
+																				    PacketRecieved->header.sequenceNumber);
+
+				xSemaphoreTake(GeneratePacket, portMAX_DELAY);
+				free(PacketBackup->data);
+				vPortFree(PacketBackup);
+				free(PacketRecieved->data);
+				vPortFree(PacketRecieved);
+				xSemaphoreGive(GeneratePacket);
+
+		 	trace_puts("Packet Sent Successfully, Sending Next Packet!");
+			continue;
+
+		 }
+		 else
+		 {
+		 	trace_printf("Node %d Did not receive ACK, Skipping Packet...\n", QueueHandleToNum(CurrentNode->CurrentQueue));
+
+			xSemaphoreTake(GeneratePacket, portMAX_DELAY);
+			free(PacketBackup->data);
+		 	vPortFree(PacketBackup);
+			free(PacketRecieved->data);
+			vPortFree(PacketRecieved);
+			xSemaphoreGive(GeneratePacket);
+
+			xQueueReset(CurrentNode->CurrentQueue);
+			continue;
+		 }
 	}
 }
 
@@ -500,14 +543,17 @@ void vRecieverTask(void *pvParameters)
 	packet* PacketRecieved = NULL;		// Buffer to Store Received Packets
 //	packet* PacketToSend = NULL;	// Buffer to Store ACKs
 
+	uint8_t sendACK = 0;
+
 	packet* PacketToSend = NULL;
 
 	BaseType_t status = pdFAIL;
 
-	QueueHandle_t SenderQueue = NULL;
-	QueueHandle_t RecieverQueue = NULL;
-	SequenceNumber_t CurrentSequence = 0;
-	uint16_t ReceivedLength = 0;
+	// QueueHandle_t SenderQueue = NULL;
+	// QueueHandle_t RecieverQueue = NULL;
+	// SequenceNumber_t CurrentSequence = 0;
+	// uint16_t ReceivedLength = 0;
+	header_t ReceivedData;
 
 	static NumOfError_t WrongPackets = 0;
 
@@ -526,46 +572,59 @@ void vRecieverTask(void *pvParameters)
 			continue;
 		}
 
-		SenderQueue = PacketRecieved->header.sender;
-		RecieverQueue = PacketRecieved->header.reciever;
-		CurrentSequence = PacketRecieved->header.sequenceNumber;
-		ReceivedLength = PacketRecieved->header.length;
+		ReceivedData = PacketRecieved->header;
 
+		xSemaphoreTake(GeneratePacket, portMAX_DELAY);
 		free(PacketRecieved->data);
-		free(PacketRecieved);
+		vPortFree(PacketRecieved);
+		xSemaphoreGive(GeneratePacket);
 
-		PacketRecieved = NULL;
-
-		// Display Recieved Packets
+		// Display Received Packets
 		trace_printf("\n\nNode %d: Received %d from %d to %d No #%d\n", QueueHandleToNum(CurrentNode->CurrentQueue),
-																  	  	ReceivedLength,
-																  	  	QueueHandleToNum(SenderQueue),
-																	  	QueueHandleToNum(RecieverQueue),
-																  	  	CurrentSequence);
+																  	  	ReceivedData.length,
+																  	  	QueueHandleToNum(ReceivedData.sender),
+																	  	QueueHandleToNum(ReceivedData.reciever),
+																  	  	ReceivedData.sequenceNumber);
 
+
+		sendACK = 1;
 		// Checks if the Received Packets are meant for the Current Node
-		if(QueueHandleToNum(RecieverQueue) == QueueHandleToNum(CurrentNode->CurrentQueue))
+		if(QueueHandleToNum(ReceivedData.reciever) == QueueHandleToNum(CurrentNode->CurrentQueue))
 		{
 					/** Handle Sequence Numbers and Count Lost Packets**/
-			switch(QueueHandleToNum(PacketRecieved->header.sender))
+			switch(QueueHandleToNum(ReceivedData.sender))
 			{
 			case 1:
-				totalLost += PacketRecieved->header.sequenceNumber - previousSequence1 - 1;
-				previousSequence1 = PacketRecieved->header.sequenceNumber;
+				if(ReceivedData.sequenceNumber <= previousSequence1)
+				{
+					trace_printf("Node %d: Already Received Packet\n\n", QueueHandleToNum(CurrentNode->CurrentQueue));
+					sendACK = 1;
+					break;
+				}
+				totalLost += ReceivedData.sequenceNumber - previousSequence1 - 1;
+				previousSequence1 = ReceivedData.sequenceNumber;
 				break;
 
 			case 2:
-				totalLost += PacketRecieved->header.sequenceNumber - previousSequence2 - 1;
-				previousSequence2 = PacketRecieved->header.sequenceNumber;
+				if(ReceivedData.sequenceNumber <= previousSequence2)
+				{
+					trace_printf("Node %d: Already Received Packet\n\n", QueueHandleToNum(CurrentNode->CurrentQueue));
+					sendACK = 1;
+					break;
+				}
+				totalLost += ReceivedData.sequenceNumber - previousSequence2 - 1;
+				previousSequence2 = ReceivedData.sequenceNumber;
 				break;
 			}
 
-// 			// Statistics Purposes
-// 			totalReceived++;
-// 			trace_printf("Received: %d, Lost: %d, Diverted: %d\n\n", totalReceived, totalLost, WrongPackets);
+			// Statistics Purposes
+			// totalReceived++;
+			// trace_printf("Received: %d, Lost: %d, Diverted: %d\n\n", totalReceived, totalLost, WrongPackets);
 
-// 			free(PacketRecieved->data);
-// 			free(PacketRecieved);
+			xSemaphoreTake(GeneratePacket, portMAX_DELAY);
+			free(PacketRecieved->data);
+			vPortFree(PacketRecieved);
+			xSemaphoreGive(GeneratePacket);
 
 // 			// Suspend Current Task if it has received 2000 or more Packets
 // 			if((totalReceived + totalLost) >= MAX_NUM_OF_PACKETS)
@@ -580,46 +639,58 @@ void vRecieverTask(void *pvParameters)
 // 				vTaskSuspendAll(); // Suspends Task
 // 			}
 
-//?			/**  ACK Part (Commented Out for Phase 1)	**/
+//?			/**  ACK Part  **/
 
-			// xSemaphoreTake(GeneratePacket, portMAX_DELAY);
+		
 
-			// PacketToSend = malloc(sizeof(packet));
-			// if(PacketToSend == NULL)
-			// {
-			// 	// Failed to Generate Packet, Trying Again
-			// 	trace_puts("Failed to Allocate ACK");
-			// 	free(PacketToSend->data);
-			// 	free(PacketToSend);
-			// 	continue;
-			// }
+			if(sendACK == 1)
+			{
+				xSemaphoreTake(GeneratePacket, portMAX_DELAY);
 
-			// // trace_printf("Received %d from Node %d", PacketRecieved->data,
-			// // 										  QueueHandleToNum(PacketRecieved->sender));
-			// PacketToSend->header.sender = CurrentNode->CurrentQueue;
-			// PacketToSend->header.reciever = SenderQueue;
-			// PacketToSend->header.sequenceNumber = CurrentSequence;
-			// PacketToSend->header.length = K;
-			// PacketToSend->data = calloc(PacketToSend->header.length - sizeof(header_t), sizeof(Payload_t));
-			// if(PacketToSend->data == NULL)
-			// {
-			// 	// Failed to Generate Packet, Trying Again
-			// 	trace_puts("Failed to Allocate ACK Data");
-			// 	free(PacketToSend->data);
-			// 	free(PacketToSend);
-			// 	continue;
-			// }
+				PacketToSend = pvPortMalloc(sizeof(packet));
+				if(PacketToSend == NULL)
+				{
+					// Failed to Generate Packet, Trying Again
+					trace_puts("Failed to Allocate ACK");
+					free(PacketToSend->data);
+					vPortFree(PacketToSend);
+					continue;
+				}
 
-			// xSemaphoreGive(GeneratePacket);
+				PacketToSend->header.sender = CurrentNode->CurrentQueue;
+				PacketToSend->header.reciever = ReceivedData.sender;
+				PacketToSend->header.sequenceNumber = ReceivedData.sequenceNumber;
+				PacketToSend->header.length = K;
+				PacketToSend->data = calloc(PacketToSend->header.length - sizeof(header_t), sizeof(Payload_t));
+				if(PacketToSend->data == NULL)
+				{
+					// Failed to Generate Packet, Trying Again
+					trace_puts("Failed to Allocate ACK Data");
+					free(PacketToSend->data);
+					vPortFree(PacketToSend);
+					continue;
+				}
 
-			// xQueueSend(RouterQueue, &PacketToSend, 0); // Send ACK
+				trace_printf("\n\nNode %d: Sending ACK from %d to %d No #%d\n", QueueHandleToNum(CurrentNode->CurrentQueue),
+																  	  			QueueHandleToNum(PacketToSend->header.sender),
+																	  			QueueHandleToNum(PacketToSend->header.reciever),
+																  	  			PacketToSend->header.sequenceNumber);
+
+				xQueueSend(RouterQueue, &PacketToSend, portMAX_DELAY); // Send ACK
+
+				xSemaphoreGive(GeneratePacket);
+			}
+		
 		}
 		else
 		{
 			trace_printf("\n\nNode %d: Received Wrong Packet from %d\n", QueueHandleToNum(CurrentNode->CurrentQueue),
-														   				 QueueHandleToNum(PacketRecieved->header.sender));
-			// free(PacketRecieved->data);
-			// free(PacketRecieved);
+														   				 QueueHandleToNum(ReceivedData.sender));
+			
+			xSemaphoreTake(GeneratePacket, portMAX_DELAY);
+			free(PacketRecieved->data);
+			vPortFree(PacketRecieved);
+			xSemaphoreGive(GeneratePacket);
 			WrongPackets++;
 		}
 	}
@@ -638,25 +709,25 @@ void vRouterTask(void *pvParameters)
 		xQueueReceive(RouterQueue, &PacketRecieved, portMAX_DELAY);
 
 		// ! Router Received Data Printer
-		// trace_printf("\n\n\nROUTER: Received Packet from %d to %d\n", QueueHandleToNum(PacketRecieved->header.sender),
-		// 											   QueueHandleToNum(PacketRecieved->header.reciever));
-		// if(PacketRecieved->header.length == K)
-		// {
-		// 	trace_printf("---Content: ACK\n\n\n");
-		// }
-		// else
-		// {
-		// 	trace_printf("Content: %d\n\n\n", PacketRecieved->header.length);
-		// }
-
+		trace_printf("\n\n\nROUTER: Received Packet from %d to %d\n", QueueHandleToNum(PacketRecieved->header.sender),
+													   QueueHandleToNum(PacketRecieved->header.reciever));
+		if(PacketRecieved->header.length == K)
+		{
+			trace_printf("---Content: ACK\n\n\n");
+		}
+		else
+		{
+			trace_printf("Content: %d\n\n\n", PacketRecieved->header.length);
+		}
 
 		if(PacketRecieved->header.length == K)
 		{
 			if(checkProb(P_ack) == pdTRUE)
 			{
-
+				xSemaphoreTake(GeneratePacket, portMAX_DELAY);
 				free(PacketRecieved->data);
 				free(PacketRecieved);
+				xSemaphoreGive(GeneratePacket);
 				trace_printf("\n\nRouter Dropped ACK...\n");
 			}
 			else
@@ -668,6 +739,10 @@ void vRouterTask(void *pvParameters)
 				if(xQueueSend(PacketRecieved->header.reciever, &PacketRecieved, 0) != pdPASS)
 				{
 					trace_printf("\n\nReceiver Queue Full, Router Dropped Packet...\n");
+					xSemaphoreTake(GeneratePacket, portMAX_DELAY);
+					free(PacketRecieved->data);
+					free(PacketRecieved);
+					xSemaphoreGive(GeneratePacket);
 					PacketRecieved = NULL;
 				}
 			}
@@ -676,8 +751,10 @@ void vRouterTask(void *pvParameters)
 		{
 			if(checkProb(Pdrop) == pdTRUE)
 			{
-				// free(PacketRecieved->data);
-				// free(PacketRecieved);
+				xSemaphoreTake(GeneratePacket, portMAX_DELAY);
+				free(PacketRecieved->data);
+				free(PacketRecieved);
+				xSemaphoreGive(GeneratePacket);
 				trace_printf("\n\nRouter Dropped Packet...\n");
 			}
 			else if(checkProb(P_WRONG_PACKET) == pdTRUE)
@@ -696,7 +773,7 @@ void vRouterTask(void *pvParameters)
 			else
 			{
 	//			vTaskDelay(Tdelay); // Delay Packet after making sure its forwarded //! Redacted, Using a Timer instead
-				xTimerChangePeriod(CurrentNode->CurrentTimer, D + ((PacketRecieved->header.length * 8.0) / C), 0);
+				// xTimerChangePeriod(CurrentNode->CurrentTimer, D + ((PacketRecieved->header.length * 8.0) / C), 0);
 				xTimerStart(CurrentNode->CurrentTimer, 0);
 				xSemaphoreTake(CurrentNode->SendDataSema, portMAX_DELAY);
 				if(xQueueSend(PacketRecieved->header.reciever, &PacketRecieved, 0) != pdPASS)
