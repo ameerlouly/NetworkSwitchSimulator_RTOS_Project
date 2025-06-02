@@ -122,7 +122,9 @@ typedef struct {
 #define Pdrop 				( (double)0.01 )
 #define P_WRONG_PACKET		( (double)0.005 )
 #define Tdelay				( pdMS_TO_TICKS(200) )
-#define K					( (uinit32_t)40 )
+#define D					( pdMS_TO_TICKS(5) )
+#define C					( (uint8_t)100 )
+#define K					( (uint16_t)40 )
 static const uint32_t	L1 = 500;
 static const uint32_t	L2 = 1500;
 
@@ -401,6 +403,8 @@ void vSenderTask(void *pvParameters)
 			/* Generate and Send Packet when Semaphore is Taken */
 //		PacketToSend = PacketGenerator(CurrentNode->CurrentQueue);	//! PacketGenerator Function causes a bug, commented out for now
 
+		xSemaphoreTake(GeneratePacket, portMAX_DELAY);
+
 		PacketToSend = malloc(sizeof(packet));
 		if(PacketToSend == NULL)
 		{
@@ -438,6 +442,7 @@ void vSenderTask(void *pvParameters)
 			break;
 		}
 
+		xSemaphoreGive(GeneratePacket);
 
 		xQueueSend(RouterQueue, &PacketToSend, portMAX_DELAY);
 
@@ -564,6 +569,9 @@ void vRecieverTask(void *pvParameters)
 // 			}
 
 //?			/**  ACK Part (Commented Out for Phase 1)	**/
+
+			xSemaphoreTake(GeneratePacket, portMAX_DELAY);
+
 			PacketToSend = malloc(sizeof(packet));
 
 			// trace_printf("Received %d from Node %d", PacketRecieved->data,
@@ -572,6 +580,8 @@ void vRecieverTask(void *pvParameters)
 			PacketToSend->header.reciever = PacketRecieved->header.sender;
 			PacketToSend->header.length = K;
 			PacketToSend->data = calloc(PacketToSend->header.length - sizeof(header_t), sizeof(Payload_t));
+
+			xSemaphoreGive(GeneratePacket);
 
 			xQueueSend(RouterQueue, &PacketToSend, 0); // Send ACK
 		}
