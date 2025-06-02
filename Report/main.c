@@ -173,8 +173,8 @@ TaskHandle_t RouterTask = NULL;
 
 /** Queue Handles *************************************************************/
 
-QueueHandle_t Node1Queue;
-QueueHandle_t Node2Queue;
+QueueHandle_t Node1_BufferQueue;
+QueueHandle_t Node2_BufferQueue;
 QueueHandle_t Node3Queue;
 QueueHandle_t Node4Queue;
 QueueHandle_t RouterQueue;
@@ -226,9 +226,9 @@ uint32_t RandomNum(uint32_t min, uint32_t max)
 
 uint8_t QueueHandleToNum(QueueHandle_t Queue)
 {
-	if(Queue == Node1Queue)
+	if(Queue == Node1_BufferQueue)
 		return 1;
-	else if(Queue == Node2Queue)
+	else if(Queue == Node2_BufferQueue)
 		return 2;
 	else if(Queue == Node3Queue)
 		return 3;
@@ -296,8 +296,8 @@ int main(int argc, char* argv[])
 //	}
 
 	/** Creating Queues **/
-	Node1Queue = xQueueCreate(1, sizeof(Ack_t*));
-	Node2Queue = xQueueCreate(1, sizeof(Ack_t*));
+	Node1_BufferQueue = xQueueCreate(1, sizeof(Ack_t*));
+	Node2_BufferQueue = xQueueCreate(1, sizeof(Ack_t*));
 	Node3Queue = xQueueCreate(10, sizeof(packet*));
 	Node4Queue = xQueueCreate(10, sizeof(packet*));
 	RouterQueue = xQueueCreate(20, sizeof(packet*));
@@ -324,15 +324,15 @@ int main(int argc, char* argv[])
 	/** Node Types Definitions ****************************************************/
 
 //					   {Task Handle, Queue Handle, SenderTimer, ACKTout Timer, SendData Semaphore}
-	NodeType_t Node1 = {Node1Task, Node1Queue, tNode1_Sender, NULL,Node1SendData};
-	NodeType_t Node2 = {Node2Task, Node2Queue, tNode2_Sender, NULL, Node2SendData};
+	NodeType_t Node1 = {Node1Task, Node1_BufferQueue, tNode1_Sender, NULL,Node1SendData};
+	NodeType_t Node2 = {Node2Task, Node2_BufferQueue, tNode2_Sender, NULL, Node2SendData};
 	NodeType_t Node3 = {Node3Task, Node3Queue, NULL, NULL, NULL};
 	NodeType_t Node4 = {Node4Task, Node4Queue, NULL, NULL, NULL};
 	NodeType_t Router = {RouterTask, RouterQueue, tRouterDelay, NULL, RouterTransmit};
 
 	/** End of Node Types Definitions *********************************************/
-	if(		Node1Queue != NULL &&
-			Node2Queue != NULL &&
+	if(		Node1_BufferQueue != NULL &&
+			Node2_BufferQueue != NULL &&
 			Node3Queue != NULL &&
 			Node4Queue != NULL &&
 			RouterQueue != NULL)	// Check if Queue Creation was successful

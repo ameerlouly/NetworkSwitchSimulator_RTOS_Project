@@ -104,6 +104,7 @@ typedef struct {
 	Payload_t* data;
 } packet;
 
+
 typedef struct {
 	TaskHandle_t* CurrentTask;
 	QueueHandle_t CurrentQueue;
@@ -116,14 +117,20 @@ typedef struct {
 
 /** Project Parameters *********************************************************/
 
-#define T1 					( pdMS_TO_TICKS(200) )
-#define T2 					( pdMS_TO_TICKS(500) )
-#define Tout 				( pdMS_TO_TICKS(200) )
-#define Pdrop 				( (double)0.01 )
+#define T1 					( pdMS_TO_TICKS(100) )
+#define T2 					( pdMS_TO_TICKS(200) )
+#define Tout 				( pdMS_TO_TICKS(150) )      // tp be replaced {150, 175, 200, 225} msec
+#define Pdrop 				( (double)0.01 )            // to be replaced {0.01, 0.02, 0.04, 0.08}
+#define P_ack 				( (double)0.01 )
 #define P_WRONG_PACKET		( (double)0.005 )
 #define Tdelay				( pdMS_TO_TICKS(200) )
-static const uint32_t	L1 = 1000;
-static const uint32_t	L2 = 2000;
+#define D					( pdMS_TO_TICKS(5) )         // Propagation delay constant  5 msec
+
+static const uint32_t	L1 = 500;
+static const uint32_t	L2 = 1500;
+static const uint8_t	K = 40;                         // ack backet size
+static const uint32_t	C = 100000;                     // link capacity (bits/sec)
+static const uint8_t	N = 1;                          // Buffer Queue size {1 , 2 , 4 , 8 , 16}
 
 /** End of Project Parameters *************************************************/
 
@@ -173,10 +180,15 @@ TaskHandle_t RouterTask = NULL;
 
 /** Queue Handles *************************************************************/
 
-QueueHandle_t Node1Queue;
-QueueHandle_t Node2Queue;
+QueueHandle_t Node1_BufferQueue;
+QueueHandle_t Node1_GenQueue;
+
+QueueHandle_t Node2_BufferQueue;
+QueueHandle_t Node2_GenQueue;
+
 QueueHandle_t Node3Queue;
 QueueHandle_t Node4Queue;
+
 QueueHandle_t RouterQueue;
 
 /** End of Queue Handles ******************************************************/
@@ -226,9 +238,9 @@ uint32_t RandomNum(uint32_t min, uint32_t max)
 
 uint8_t QueueHandleToNum(QueueHandle_t Queue)
 {
-	if(Queue == Node1Queue)
+	if(Queue == Node1_BufferQueue)
 		return 1;
-	else if(Queue == Node2Queue)
+	else if(Queue == Node2_BufferQueue)
 		return 2;
 	else if(Queue == Node3Queue)
 		return 3;
@@ -296,8 +308,8 @@ int main(int argc, char* argv[])
 //	}
 
 	/** Creating Queues **/
-	Node1Queue = xQueueCreate(1, sizeof(Ack_t*));
-	Node2Queue = xQueueCreate(1, sizeof(Ack_t*));
+	Node1_BufferQueue = xQueueCreate(N, sizeof(Ack_t*));
+	Node2_BufferQueue = xQueueCreate(N, sizeof(Ack_t*));
 	Node3Queue = xQueueCreate(10, sizeof(packet*));
 	Node4Queue = xQueueCreate(10, sizeof(packet*));
 	RouterQueue = xQueueCreate(20, sizeof(packet*));
@@ -324,15 +336,15 @@ int main(int argc, char* argv[])
 	/** Node Types Definitions ****************************************************/
 
 //					   {Task Handle, Queue Handle, SenderTimer, ACKTout Timer, SendData Semaphore}
-	NodeType_t Node1 = {Node1Task, Node1Queue, tNode1_Sender, NULL,Node1SendData};
-	NodeType_t Node2 = {Node2Task, Node2Queue, tNode2_Sender, NULL, Node2SendData};
+	NodeType_t Node1 = {Node1Task, Node1_BufferQueue, tNode1_Sender, NULL,Node1SendData};
+	NodeType_t Node2 = {Node2Task, Node2_BufferQueue, tNode2_Sender, NULL, Node2SendData};
 	NodeType_t Node3 = {Node3Task, Node3Queue, NULL, NULL, NULL};
 	NodeType_t Node4 = {Node4Task, Node4Queue, NULL, NULL, NULL};
 	NodeType_t Router = {RouterTask, RouterQueue, tRouterDelay, NULL, RouterTransmit};
 
 	/** End of Node Types Definitions *********************************************/
-	if(		Node1Queue != NULL &&
-			Node2Queue != NULL &&
+	if(		Node1_BufferQueue != NULL &&
+			Node2_BufferQueue != NULL &&
 			Node3Queue != NULL &&
 			Node4Queue != NULL &&
 			RouterQueue != NULL)	// Check if Queue Creation was successful
