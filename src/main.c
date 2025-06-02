@@ -588,6 +588,7 @@ void vRecieverTask(void *pvParameters)
 			// 										  QueueHandleToNum(PacketRecieved->sender));
 			PacketToSend->header.sender = PacketRecieved->header.reciever;
 			PacketToSend->header.reciever = PacketRecieved->header.sender;
+			PacketToSend->header.sequenceNumber = PacketRecieved->header.sequenceNumber;
 			PacketToSend->header.length = K;
 			PacketToSend->data = calloc(PacketToSend->header.length - sizeof(header_t), sizeof(Payload_t));
 			if(PacketToSend->data == NULL)
