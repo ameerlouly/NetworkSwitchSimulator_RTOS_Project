@@ -584,8 +584,8 @@ void vSenderTask(void *pvParameters)
 			trace_puts("Before Free 4");
 			vPortFree(PacketBackup->data);
 		 	vPortFree(PacketBackup);
-			vPortFree(PacketRecieved->data);
-			vPortFree(PacketRecieved);
+			// vPortFree(PacketRecieved->data);
+			// vPortFree(PacketRecieved);
 			xSemaphoreGive(GeneratePacket);
 		 }
 
