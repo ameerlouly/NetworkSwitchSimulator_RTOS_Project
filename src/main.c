@@ -112,7 +112,7 @@ typedef struct {
 	TimerHandle_t CurrentTimer;
 	TimerHandle_t ACKToutTimer;
 	SemaphoreHandle_t SendDataSema;
-	SemaphoreHandle_t ACK_Tout;
+	SemaphoreHandle_t ACK_Sema;
 } NodeType_t;
 
 /** End of Type Declarations ***************************************************/
@@ -303,7 +303,7 @@ int main(int argc, char* argv[])
 	tNode2_ACKTout = xTimerCreate("Node 2 Tout",
 								 Tout,
 								 pdFALSE,
-								 (void*)1,
+								 (void*)2,
 								 vACKToutCallBack);
 //	xTimerStart(tNode1_Sender, 0);
 //	if(tNode1_Sender == NULL)
@@ -492,7 +492,7 @@ void vSenderTask(void *pvParameters)
 		for(int i = 0; i < NUM_OF_TRIES; i++)
 		{
 			xTimerStart(CurrentNode->ACKToutTimer, 0);
-			xSemaphoreTake(CurrentNode->ACK_Tout, portMAX_DELAY);
+			xSemaphoreTake(CurrentNode->ACK_Sema, portMAX_DELAY);
 			status = xQueueReceive(CurrentNode->CurrentQueue, &PacketRecieved, 0);
 			if(status == pdPASS)
 			{
