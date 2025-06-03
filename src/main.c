@@ -487,7 +487,7 @@ void vSenderTask(void *pvParameters)
 
 		xSemaphoreGive(GeneratePacket);
 
-//?				/** ACK Part (Sender Section) **/
+//? ****************** ACK Part (Sender Section) ********************************************************************************************************************
 		uint8_t ACK_recieved = 0;
 		for(int i = 0; i < NUM_OF_TRIES; i++)
 		{
@@ -506,11 +506,13 @@ void vSenderTask(void *pvParameters)
 					}
 					else
 					{
+						// In case of recieving an old ACK from a previous packet
 						trace_puts("Before Free 1");
 						xSemaphoreTake(GeneratePacket, portMAX_DELAY);
 						vPortFree(PacketRecieved->data);
 						vPortFree(PacketRecieved);
 						xSemaphoreGive(GeneratePacket);
+						continue;
 					}
 					break;
 					
@@ -522,11 +524,13 @@ void vSenderTask(void *pvParameters)
 					}
 					else
 					{
+						// In case of recieving an old ACK from a previous packet
 						trace_puts("Before Free 2");
 						xSemaphoreTake(GeneratePacket, portMAX_DELAY);
 						vPortFree(PacketRecieved->data);
 						vPortFree(PacketRecieved);
 						xSemaphoreGive(GeneratePacket);
+						continue;
 					}
 					break;
 				}
@@ -557,18 +561,18 @@ void vSenderTask(void *pvParameters)
 		 if(ACK_recieved == 1)
 		 {
 			// Display Received Packets
-				trace_printf("\n\n***Node %d: Received ACK from %d to %d No #%d\n", QueueHandleToNum(CurrentNode->CurrentQueue),
-																				    QueueHandleToNum(PacketRecieved->header.sender),
-																				    QueueHandleToNum(PacketRecieved->header.reciever),
-																				    PacketRecieved->header.sequenceNumber);
+			trace_printf("\n\n***Node %d: Received ACK from %d to %d No #%d\n", QueueHandleToNum(CurrentNode->CurrentQueue),
+																				QueueHandleToNum(PacketRecieved->header.sender),
+																				QueueHandleToNum(PacketRecieved->header.reciever),
+																				PacketRecieved->header.sequenceNumber);
 
-				xSemaphoreTake(GeneratePacket, portMAX_DELAY);
-				trace_puts("Before Free 3");
-				vPortFree(PacketBackup->data);
-				vPortFree(PacketBackup);
-				vPortFree(PacketRecieved->data);
-				vPortFree(PacketRecieved);
-				xSemaphoreGive(GeneratePacket);
+			xSemaphoreTake(GeneratePacket, portMAX_DELAY);
+			trace_puts("Before Free 3");
+			vPortFree(PacketBackup->data);
+			vPortFree(PacketBackup);
+			vPortFree(PacketRecieved->data);
+			vPortFree(PacketRecieved);
+			xSemaphoreGive(GeneratePacket);
 
 		 	trace_puts("Packet Sent Successfully, Sending Next Packet!");
 		 }

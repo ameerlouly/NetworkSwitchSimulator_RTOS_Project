@@ -5000,57 +5000,58 @@ END GROUP
                 0x00000000080017e8       0x54 ./src/main.o
                 0x00000000080017e8                QueueHandleToNum
  .text.vSenderTask
-                0x000000000800183c      0x424 ./src/main.o
+                0x000000000800183c      0x41c ./src/main.o
                 0x000000000800183c                vSenderTask
  .text.vRecieverTask
-                0x0000000008001c60      0x234 ./src/main.o
-                0x0000000008001c60                vRecieverTask
- *fill*         0x0000000008001e94        0x4 
+                0x0000000008001c58      0x234 ./src/main.o
+                0x0000000008001c58                vRecieverTask
+ *fill*         0x0000000008001e8c        0x4 
  .text.checkProb
-                0x0000000008001e98       0x5c ./src/main.o
-                0x0000000008001e98                checkProb
- *fill*         0x0000000008001ef4        0x4 
+                0x0000000008001e90       0x5c ./src/main.o
+                0x0000000008001e90                checkProb
+ *fill*         0x0000000008001eec        0x4 
  .text.vRouterTask
-                0x0000000008001ef8      0x378 ./src/main.o
-                0x0000000008001ef8                vRouterTask
- .text.main     0x0000000008002270      0x35c ./src/main.o
-                0x0000000008002270                main
+                0x0000000008001ef0      0x378 ./src/main.o
+                0x0000000008001ef0                vRouterTask
+ .text.main     0x0000000008002268      0x35c ./src/main.o
+                0x0000000008002268                main
  .text.vApplicationMallocFailedHook
-                0x00000000080025cc        0x2 ./src/main.o
-                0x00000000080025cc                vApplicationMallocFailedHook
+                0x00000000080025c4        0x2 ./src/main.o
+                0x00000000080025c4                vApplicationMallocFailedHook
  .text.vApplicationStackOverflowHook
-                0x00000000080025ce        0x2 ./src/main.o
-                0x00000000080025ce                vApplicationStackOverflowHook
+                0x00000000080025c6        0x2 ./src/main.o
+                0x00000000080025c6                vApplicationStackOverflowHook
  .text.vApplicationIdleHook
-                0x00000000080025d0       0x12 ./src/main.o
-                0x00000000080025d0                vApplicationIdleHook
+                0x00000000080025c8       0x12 ./src/main.o
+                0x00000000080025c8                vApplicationIdleHook
  .text.vApplicationTickHook
-                0x00000000080025e2        0x2 ./src/main.o
-                0x00000000080025e2                vApplicationTickHook
+                0x00000000080025da        0x2 ./src/main.o
+                0x00000000080025da                vApplicationTickHook
  .text.HAL_MspInit
-                0x00000000080025e4        0x2 ./src/stm32f4xx_hal_msp.o
-                0x00000000080025e4                HAL_MspInit
- *fill*         0x00000000080025e6        0x2 
+                0x00000000080025dc        0x2 ./src/stm32f4xx_hal_msp.o
+                0x00000000080025dc                HAL_MspInit
+ *fill*         0x00000000080025de        0x2 
  .text.prvHeapInit
-                0x00000000080025e8       0x64 ./FreeRTOS Source/portable/MemMang/heap_4.o
+                0x00000000080025e0       0x64 ./FreeRTOS Source/portable/MemMang/heap_4.o
  .text.prvInsertBlockIntoFreeList
-                0x000000000800264c       0x64 ./FreeRTOS Source/portable/MemMang/heap_4.o
+                0x0000000008002644       0x64 ./FreeRTOS Source/portable/MemMang/heap_4.o
  .text.pvPortMalloc
-                0x00000000080026b0      0x104 ./FreeRTOS Source/portable/MemMang/heap_4.o
-                0x00000000080026b0                pvPortMalloc
+                0x00000000080026a8      0x104 ./FreeRTOS Source/portable/MemMang/heap_4.o
+                0x00000000080026a8                pvPortMalloc
  .text.vPortFree
-                0x00000000080027b4       0x70 ./FreeRTOS Source/portable/MemMang/heap_4.o
-                0x00000000080027b4                vPortFree
+                0x00000000080027ac       0x70 ./FreeRTOS Source/portable/MemMang/heap_4.o
+                0x00000000080027ac                vPortFree
  .text.xPortGetFreeHeapSize
-                0x0000000008002824        0xc ./FreeRTOS Source/portable/MemMang/heap_4.o
-                0x0000000008002824                xPortGetFreeHeapSize
+                0x000000000800281c        0xc ./FreeRTOS Source/portable/MemMang/heap_4.o
+                0x000000000800281c                xPortGetFreeHeapSize
  .text.prvTaskExitError
-                0x0000000008002830       0x34 ./FreeRTOS Source/portable/GCC/ARM_CM4F/port.o
+                0x0000000008002828       0x34 ./FreeRTOS Source/portable/GCC/ARM_CM4F/port.o
  .text.prvPortStartFirstTask
-                0x0000000008002864       0x20 ./FreeRTOS Source/portable/GCC/ARM_CM4F/port.o
+                0x000000000800285c       0x20 ./FreeRTOS Source/portable/GCC/ARM_CM4F/port.o
  .text.pxPortInitialiseStack
-                0x0000000008002884       0x2c ./FreeRTOS Source/portable/GCC/ARM_CM4F/port.o
-                0x0000000008002884                pxPortInitialiseStack
+                0x000000000800287c       0x2c ./FreeRTOS Source/portable/GCC/ARM_CM4F/port.o
+                0x000000000800287c                pxPortInitialiseStack
+ *fill*         0x00000000080028a8        0x8 
  .text.SVC_Handler
                 0x00000000080028b0       0x24 ./FreeRTOS Source/portable/GCC/ARM_CM4F/port.o
                 0x00000000080028b0                SVC_Handler
@@ -6139,7 +6140,7 @@ END GROUP
  .debug_abbrev  0x000000000000266d      0x35c ./FreeRTOS Source/tasks.o
  .debug_abbrev  0x00000000000029c9      0x236 ./FreeRTOS Source/timers.o
 
-.debug_line     0x0000000000000000    0x11eac
+.debug_line     0x0000000000000000    0x11ec4
  *(.debug_line)
  .debug_line    0x0000000000000000      0xd72 ./system/src/stm32f4-hal/stm32f4xx_hal.o
  .debug_line    0x0000000000000d72     0x10ba ./system/src/stm32f4-hal/stm32f4xx_hal_cortex.o
@@ -6156,14 +6157,14 @@ END GROUP
  .debug_line    0x0000000000008170      0xacc ./system/src/cmsis/system_stm32f4xx.o
  .debug_line    0x0000000000008c3c      0x2d2 ./system/src/cmsis/vectors_stm32f407xx.o
  .debug_line    0x0000000000008f0e      0xbe7 ./src/initialize-hardware.o
- .debug_line    0x0000000000009af5      0xf6b ./src/main.o
- .debug_line    0x000000000000aa60      0xa2a ./src/stm32f4xx_hal_msp.o
- .debug_line    0x000000000000b48a      0x91d ./FreeRTOS Source/portable/MemMang/heap_4.o
- .debug_line    0x000000000000bda7      0x87e ./FreeRTOS Source/portable/GCC/ARM_CM4F/port.o
- .debug_line    0x000000000000c625      0x60a ./FreeRTOS Source/list.o
- .debug_line    0x000000000000cc2f     0x1aee ./FreeRTOS Source/queue.o
- .debug_line    0x000000000000e71d     0x29ce ./FreeRTOS Source/tasks.o
- .debug_line    0x00000000000110eb      0xdc1 ./FreeRTOS Source/timers.o
+ .debug_line    0x0000000000009af5      0xf83 ./src/main.o
+ .debug_line    0x000000000000aa78      0xa2a ./src/stm32f4xx_hal_msp.o
+ .debug_line    0x000000000000b4a2      0x91d ./FreeRTOS Source/portable/MemMang/heap_4.o
+ .debug_line    0x000000000000bdbf      0x87e ./FreeRTOS Source/portable/GCC/ARM_CM4F/port.o
+ .debug_line    0x000000000000c63d      0x60a ./FreeRTOS Source/list.o
+ .debug_line    0x000000000000cc47     0x1aee ./FreeRTOS Source/queue.o
+ .debug_line    0x000000000000e735     0x29ce ./FreeRTOS Source/tasks.o
+ .debug_line    0x0000000000011103      0xdc1 ./FreeRTOS Source/timers.o
 
 .debug_frame    0x0000000000000000     0x2958
  *(.debug_frame)
@@ -6281,7 +6282,7 @@ END GROUP
  .debug_str     0x00000000000fee17      0x3c9 ./FreeRTOS Source/timers.o
                                        0xb520 (size before relaxing)
 
-.debug_loc      0x0000000000000000     0x80fc
+.debug_loc      0x0000000000000000     0x80f0
  *(.debug_loc)
  .debug_loc     0x0000000000000000      0x130 ./system/src/stm32f4-hal/stm32f4xx_hal.o
  .debug_loc     0x0000000000000130      0x92e ./system/src/stm32f4-hal/stm32f4xx_hal_cortex.o
@@ -6296,13 +6297,13 @@ END GROUP
  .debug_loc     0x0000000000002d64      0x524 ./system/src/cortexm/exception-handlers.o
  .debug_loc     0x0000000000003288      0x158 ./system/src/cmsis/system_stm32f4xx.o
  .debug_loc     0x00000000000033e0       0x64 ./src/initialize-hardware.o
- .debug_loc     0x0000000000003444      0x5e3 ./src/main.o
- .debug_loc     0x0000000000003a27      0x319 ./FreeRTOS Source/portable/MemMang/heap_4.o
- .debug_loc     0x0000000000003d40      0x124 ./FreeRTOS Source/portable/GCC/ARM_CM4F/port.o
- .debug_loc     0x0000000000003e64       0xad ./FreeRTOS Source/list.o
- .debug_loc     0x0000000000003f11     0x143c ./FreeRTOS Source/queue.o
- .debug_loc     0x000000000000534d     0x2185 ./FreeRTOS Source/tasks.o
- .debug_loc     0x00000000000074d2      0xc2a ./FreeRTOS Source/timers.o
+ .debug_loc     0x0000000000003444      0x5d7 ./src/main.o
+ .debug_loc     0x0000000000003a1b      0x319 ./FreeRTOS Source/portable/MemMang/heap_4.o
+ .debug_loc     0x0000000000003d34      0x124 ./FreeRTOS Source/portable/GCC/ARM_CM4F/port.o
+ .debug_loc     0x0000000000003e58       0xad ./FreeRTOS Source/list.o
+ .debug_loc     0x0000000000003f05     0x143c ./FreeRTOS Source/queue.o
+ .debug_loc     0x0000000000005341     0x2185 ./FreeRTOS Source/tasks.o
+ .debug_loc     0x00000000000074c6      0xc2a ./FreeRTOS Source/timers.o
 
 .debug_macinfo
  *(.debug_macinfo)
