@@ -592,7 +592,6 @@ void vSenderTask(void *pvParameters)
 			vPortFree(PacketRecieved);
 			xSemaphoreGive(GeneratePacket);
 
-			xQueueReset(CurrentNode->CurrentQueue);
 		 	trace_puts("Packet Sent Successfully, Sending Next Packet!");
 		 }
 		 else
@@ -615,16 +614,16 @@ void vSenderTask(void *pvParameters)
 		printf("Total Packets Sent: %d\n", totalSent);
 		printf("Total ACKs Received: %d\n", totalACKsReceived);
 		printf("Total Packets Dropped: %d\n\n", totalDropped);
-		printf("Bytes Sent: %d\n", BytesSent);
-		printf("Bytes Successful: %d\n", BytesSuccess);
-		printf("Bytes Failed: %d\n", BytesFailed);
+		printf("Bytes Sent: %ld\n", BytesSent);
+		printf("Bytes Successful: %ld\n", BytesSuccess);
+		printf("Bytes Failed: %ld\n", BytesFailed);
 		puts("------------------------------------------\n\n\n\n\n");
 
 		if(totalSent == 2500)
 		{
 			endTime = xTaskGetTickCount();
 			trace_puts("\n\n\n...SUSPENDING ALL TASKS...\n");
-			trace_printf("Total Elapsed Time = %d seconds", ((endTime - startTime) * portTICK_PERIOD_MS) / 1000);
+			trace_printf("Total Elapsed Time = %ld seconds", ((endTime - startTime) * portTICK_PERIOD_MS) / 1000);
 			vTaskSuspendAll();
 		}
 	}
@@ -982,8 +981,8 @@ void vACKToutCallBack(TimerHandle_t xTimer)
 
 void vApplicationMallocFailedHook( void )
 {
-	/* Called if a call to malloc() fails because there is insufficient
-	free memory available in the FreeRTOS heap.  malloc() is called
+	/* Called if a call to pvPortMalloc() fails because there is insufficient
+	free memory available in the FreeRTOS heap.  pvPortMalloc() is called
 	internally by FreeRTOS API functions that create tasks, queues, software
 	timers, and semaphores.  The size of the FreeRTOS heap is set by the
 	configTOTAL_HEAP_SIZE configuration constant in FreeRTOSConfig.h. */
