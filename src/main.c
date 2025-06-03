@@ -442,6 +442,7 @@ void vSenderTask(void *pvParameters)
 		if(PacketToSend->data == NULL)
 		{
 			trace_puts("Failed to allocate data");
+			free(PacketToSend);
 			continue;
 		}
 
