@@ -81,8 +81,10 @@
 /** Type Declarations	*******************************************************/
 
 typedef uint32_t SequenceNumber_t;
-typedef uint32_t NumOfError_t;
+typedef uint16_t NumOfError_t;
 typedef uint16_t NumOfPackets_t;
+typedef uint32_t NumOfBytes_t;
+
 typedef uint8_t  Payload_t;
 
 typedef struct {
@@ -273,6 +275,13 @@ BaseType_t checkProb(double prob)
 
 //** End of Helpful Functions Definitions **************************************/
 
+/** Global Variables for Statistics ***************/
+
+TickType_t startTime = 0;
+TickType_t endTime = 0;
+
+/** End Global Variables for Statistics ***********/
+
 int main(int argc, char* argv[])
 {
 	// Add your code here.
@@ -372,6 +381,7 @@ int main(int argc, char* argv[])
 		if(status == pdPASS)
 		{
 			puts("Starting Scheduler\n");
+			startTime = xTaskGetTickCount();
 			vTaskStartScheduler();
 		}
 		else
@@ -410,6 +420,10 @@ void vSenderTask(void *pvParameters)
 	NumOfPackets_t totalSent = 0;
 	NumOfPackets_t totalACKsReceived = 0;
 	NumOfPackets_t totalDropped = 0;
+
+	NumOfBytes_t BytesSent = 0;
+	NumOfBytes_t BytesSuccess = 0;
+	NumOfBytes_t BytesFailed = 0;
 
 //?		/** Used for ACK Part **/
 	packet* PacketRecieved = NULL; // Buffer to store recieved ACK Packets
@@ -480,6 +494,7 @@ void vSenderTask(void *pvParameters)
 			trace_printf("Node %d: Sent Successfully to %d\n", QueueHandleToNum(PacketToSend->header.sender),
 															   QueueHandleToNum(PacketToSend->header.reciever));
 			totalSent++;
+			BytesSent += PacketBackup->header.length;
 		}
 		else
 		{
@@ -567,6 +582,8 @@ void vSenderTask(void *pvParameters)
 																				PacketRecieved->header.sequenceNumber);
 
 			totalACKsReceived++;
+			BytesSuccess += PacketBackup->header.length;
+
 			xSemaphoreTake(GeneratePacket, portMAX_DELAY);
 			// trace_puts("Before Free 3");
 			vPortFree(PacketBackup->data);
@@ -582,6 +599,8 @@ void vSenderTask(void *pvParameters)
 		 {
 		 	trace_printf("Node %d Did not receive ACK, Skipping Packet...\n", QueueHandleToNum(CurrentNode->CurrentQueue));
 
+			BytesFailed += PacketBackup->header.length;
+
 			xSemaphoreTake(GeneratePacket, portMAX_DELAY);
 			// trace_puts("Before Free 4");
 			vPortFree(PacketBackup->data);
@@ -595,10 +614,16 @@ void vSenderTask(void *pvParameters)
 		printf("\n\n\n\n-------NODE %d STATISTICS--------\n", QueueHandleToNum(CurrentNode->CurrentQueue));
 		printf("Total Packets Sent: %d\n", totalSent);
 		printf("Total ACKs Received: %d\n", totalACKsReceived);
-		printf("Total Packets Dropped: %d\n\n\n\n", totalDropped);
+		printf("Total Packets Dropped: %d\n", totalDropped);
+		printf("Bytes Sent: %d\n", BytesSent);
+		printf("Bytes Successful: %d\n", BytesSuccess);
+		printf("Bytes Failed: %d\n\n\n", BytesFailed);
 
 		if(totalSent == 4100)
 		{
+			endTime = xTaskGetTickCount();
+			trace_puts("\n\n\n...SUSPENDING ALL TASKS...\n");
+			trace_printf("Total Elapsed Time = %d seconds", ((endTime - startTime) * portTICK_PERIOD_MS) / 1000);
 			vTaskSuspendAll();
 		}
 	}
