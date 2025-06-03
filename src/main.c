@@ -124,7 +124,7 @@ typedef struct {
 
 #define T1 					( pdMS_TO_TICKS(100) )
 #define T2 					( pdMS_TO_TICKS(200) )
-#define Tout 				( pdMS_TO_TICKS(200) )
+#define Tout 				( pdMS_TO_TICKS(150) )
 #define Pdrop 				( (double)0.01 )
 #define P_ack 				( (double)0.01 )
 #define P_WRONG_PACKET		( (double)0.0 )
@@ -188,6 +188,7 @@ QueueHandle_t Node2Queue;
 QueueHandle_t Node3Queue;
 QueueHandle_t Node4Queue;
 QueueHandle_t RouterQueue;
+QueueHandle_t RouterACKQueue;
 
 /** End of Queue Handles ******************************************************/
 
@@ -310,7 +311,8 @@ int main(int argc, char* argv[])
 	Node2Queue = xQueueCreate(10, sizeof(packet*));
 	Node3Queue = xQueueCreate(10, sizeof(packet*));
 	Node4Queue = xQueueCreate(10, sizeof(packet*));
-	RouterQueue = xQueueCreate(10, sizeof(packet*));
+	RouterQueue = xQueueCreate(20, sizeof(packet*));
+	// RouterACKQueue = xQueueCreate(10, sizeof(packet*));
 
 	/** Creating Semaphores **/
 	Node1SendData = xSemaphoreCreateBinary();
@@ -348,8 +350,8 @@ int main(int argc, char* argv[])
 			RouterQueue != NULL)	// Check if Queue Creation was successful
 	{
 		// Creating Tasks
-		status = xTaskCreate(vSenderTask, "Node 1", 1024, (void*)&Node1, 1, &Node1Task);
-		status &= xTaskCreate(vSenderTask, "Node 2", 1024, (void*)&Node2, 1, &Node2Task);
+		status = xTaskCreate(vSenderTask, "Node 1", 512, (void*)&Node1, 1, &Node1Task);
+		status &= xTaskCreate(vSenderTask, "Node 2", 512, (void*)&Node2, 1, &Node2Task);
 		status &= xTaskCreate(vRecieverTask, "Node 3", 512, (void*)&Node3, 2, &Node3Task);
 		status &= xTaskCreate(vRecieverTask, "Node 4", 512, (void*)&Node4, 2, &Node4Task);
 		status &= xTaskCreate(vRouterTask, "Router", 512, (void*)&Router, 3, &RouterTask);
@@ -405,14 +407,16 @@ void vSenderTask(void *pvParameters)
 		vTaskDelay(pdMS_TO_TICKS(20)); // Small delay so that both tasks dont start at the same time
 	}
 
+	xQueueReset(CurrentNode->CurrentQueue);
+
 	while(1)
 	{
+		
 		xTimerStart(CurrentNode->CurrentTimer, 0);
 		xSemaphoreTake(CurrentNode->SendDataSema, portMAX_DELAY);	// Dont Start Sending Data until allowed; Sema = 0
 
-			/* Generate and Send Packet when Semaphore is Taken */
 		xSemaphoreTake(GeneratePacket, portMAX_DELAY);
-
+			/* Generate and Send Packet when Semaphore is Taken */
 		PacketToSend = malloc(sizeof(packet));
 		if(PacketToSend == NULL)
 		{
@@ -446,12 +450,12 @@ void vSenderTask(void *pvParameters)
 			continue;
 		}
 
-
 			/* Store A Backup of the Data transmitted in case of retransmission */
-		PacketBackup = malloc(sizeof(packet));
-		PacketBackup->data = calloc(PacketToSend->header.length - sizeof(header_t), sizeof(Payload_t));
+		PacketBackup = (packet*)malloc(sizeof(packet));
+		PacketBackup->data = (Payload_t*)calloc(PacketToSend->header.length - sizeof(header_t), sizeof(Payload_t));
 		memcpy(PacketBackup->data, PacketToSend->data, sizeof(Payload_t) * (PacketToSend->header.length - sizeof(header_t)));
-		PacketBackup->header = PacketToSend->header;
+		memcpy(&PacketBackup->header, &PacketToSend->header, sizeof(header_t));
+
 
 		trace_printf("Node %d: Sending %d to %d No #%d\n", QueueHandleToNum(CurrentNode->CurrentQueue),
 														   PacketToSend->header.length,
@@ -459,7 +463,15 @@ void vSenderTask(void *pvParameters)
 														   CurrentSequence);
 
 		totalSent++;											 
-		xQueueSend(RouterQueue, &PacketToSend, portMAX_DELAY);
+		if(xQueueSend(RouterQueue, &PacketToSend, portMAX_DELAY) == pdPASS)
+		{
+			trace_printf("Node %d: Sent Successfully to %d\n", QueueHandleToNum(PacketToSend->header.sender),
+															   QueueHandleToNum(PacketToSend->header.reciever));
+		}
+		else
+		{
+			trace_printf("Node %d: Failed to Send\n", QueueHandleToNum(CurrentNode->CurrentQueue));
+		}
 
 		xSemaphoreGive(GeneratePacket);
 
@@ -473,16 +485,34 @@ void vSenderTask(void *pvParameters)
 			 	switch(QueueHandleToNum(PacketRecieved->header.sender))
 				{
 					case 3:
-					if(PacketRecieved->header.sequenceNumber == SequenceToNode3)
+					if(PacketRecieved->header.sequenceNumber >= SequenceToNode3)
 					{
+						SequenceToNode3 = PacketRecieved->header.sequenceNumber;
 						ACK_recieved = 1;
+					}
+					else
+					{
+						xSemaphoreTake(GeneratePacket, portMAX_DELAY);
+						free(PacketRecieved->data);
+						free(PacketRecieved);
+						PacketRecieved = NULL;
+						xSemaphoreGive(GeneratePacket);
 					}
 					break;
 					
 					case 4:
-					if(PacketRecieved->header.sequenceNumber == SequenceToNode4)
+					if(PacketRecieved->header.sequenceNumber >= SequenceToNode4)
 					{
+						SequenceToNode4 = PacketRecieved->header.sequenceNumber;
 						ACK_recieved = 1;
+					}
+					else
+					{
+						xSemaphoreTake(GeneratePacket, portMAX_DELAY);
+						free(PacketRecieved->data);
+						free(PacketRecieved);
+						PacketRecieved = NULL;
+						xSemaphoreGive(GeneratePacket);
 					}
 					break;
 				}
@@ -500,8 +530,8 @@ void vSenderTask(void *pvParameters)
 																	   				CurrentSequence,
 																	   				i + 1);
 				xSemaphoreTake(GeneratePacket, portMAX_DELAY);
-				PacketToSend->header = PacketBackup->header;
-				memcpy(PacketToSend->data, PacketBackup->data, sizeof(Payload_t) * (PacketToSend->header.length - sizeof(header_t)));																	
+				memcpy(PacketToSend->data, PacketBackup->data, sizeof(Payload_t) * (PacketBackup->header.length - sizeof(header_t)));
+				memcpy(&PacketToSend->header, &PacketBackup->header, sizeof(header_t));																
 			 	xQueueSend(RouterQueue, &PacketToSend, portMAX_DELAY);
 				xSemaphoreGive(GeneratePacket);
 			 }
@@ -563,11 +593,24 @@ void vRecieverTask(void *pvParameters)
 
 	NumOfPackets_t totalLost = 0;
 
+	xQueueReset(CurrentNode->CurrentQueue);
+
 	while(1)
 	{
 		status = xQueueReceive(CurrentNode->CurrentQueue, &PacketRecieved, portMAX_DELAY);
 		if(status != pdPASS)
 		{
+			continue;
+		}
+		else if(PacketRecieved == NULL)
+		{
+			continue;
+		}
+		else if(QueueHandleToNum(PacketRecieved->header.sender) == 255 || QueueHandleToNum(PacketRecieved->header.reciever) == 255)
+		{
+			puts("Receiver: Corrupted Packet, Dropping");
+			free(PacketRecieved->data);
+			free(PacketRecieved);
 			continue;
 		}
 
@@ -692,24 +735,46 @@ void vRouterTask(void *pvParameters)
 	NodeType_t *CurrentNode = (NodeType_t*)pvParameters;
 
 	packet* PacketRecieved = NULL;	// Buffer to Process Received Packets
+	packet* ACKReceived = NULL;
+
+	BaseType_t status;
+
+	xQueueReset(CurrentNode->CurrentQueue);
 
 	while(1)
 	{
-		xQueueReceive(RouterQueue, &PacketRecieved, portMAX_DELAY);
+		status = xQueueReceive(RouterQueue, &PacketRecieved, portMAX_DELAY);
+		// status = xQueueReceive(RouterACKQueue, &ACKReceived, pdMS_TO_TICKS(1));
+
+		if(QueueHandleToNum(PacketRecieved->header.sender) == 255 || QueueHandleToNum(PacketRecieved->header.reciever) == 255)
+		{
+			puts("ROUTER: Corrupted Packet, Dropping");
+			free(PacketRecieved->data);
+			free(PacketRecieved);
+			continue;
+		}
 
 		//? Router Received Data Printer
 		printf("\n\n\nROUTER: Received Packet from %d to %d\n", QueueHandleToNum(PacketRecieved->header.sender),
 													   QueueHandleToNum(PacketRecieved->header.reciever));
-		if(PacketRecieved->header.length == K)
+		if(status == pdPASS && PacketRecieved->header.length == K)
 		{
 			printf("---Content: ACK\n\n\n");
 		}
-		else
+		else if(status == pdPASS)
 		{
 			printf("Content: %d\n\n\n", PacketRecieved->header.length);
 		}
+		else if(PacketRecieved == NULL)
+		{
+			continue;
+		}
+		else
+		{
+			continue;
+		}
 
-		if(PacketRecieved->header.length == K)
+		if(status == pdPASS && PacketRecieved->header.length == K)
 		{
 			if(checkProb(P_ack) == pdTRUE)
 			{
@@ -735,7 +800,7 @@ void vRouterTask(void *pvParameters)
 				}
 			}
 		}
-		else
+		else if(status == pdPASS)
 		{
 			if(checkProb(Pdrop) == pdTRUE)
 			{
@@ -771,6 +836,12 @@ void vRouterTask(void *pvParameters)
 				}
 			}
 		}
+		else
+		{
+			puts("ROUTER: Failed to receive packet");
+			free(PacketRecieved->data);
+			free(PacketRecieved);
+		}
 	}
 }
 
@@ -795,7 +866,7 @@ void vSenderTimerCallBack(TimerHandle_t xTimer)
 		break;
 	}
 
-	// xTimerChangePeriodFromISR(xTimer, RandomNum(T1,T2), &xHigherPriorityTaskWoken);
+	xTimerChangePeriodFromISR(xTimer, RandomNum(T1,T2), &xHigherPriorityTaskWoken);
 
 	if(xHigherPriorityTaskWoken)
 	{
