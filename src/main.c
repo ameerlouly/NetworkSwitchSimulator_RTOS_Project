@@ -731,7 +731,7 @@ void vRouterTask(void *pvParameters)
 			else
 			{
 	//			vTaskDelay(Tdelay); // Delay Packet after making sure its forwarded //! Redacted, Using a Timer instead
-				// xTimerChangePeriod(CurrentNode->CurrentTimer, D + ((PacketRecieved->header.length * 8.0) / C), 0);
+				xTimerChangePeriod(CurrentNode->CurrentTimer, D + ((PacketRecieved->header.length * 8.0) / C), 0);
 				xTimerStart(CurrentNode->CurrentTimer, 0);
 				xSemaphoreTake(CurrentNode->SendDataSema, portMAX_DELAY);
 				if(xQueueSend(PacketRecieved->header.reciever, &PacketRecieved, 0) != pdPASS)
@@ -758,7 +758,7 @@ void vRouterTask(void *pvParameters)
 			else if(checkProb(P_WRONG_PACKET) == pdTRUE)
 			{
 				trace_printf("\n\nRouter Diverting Packet...\n");
-				// xTimerChangePeriod(CurrentNode->CurrentTimer, D + ((PacketRecieved->header.length * 8.0) / C), 0);
+				xTimerChangePeriod(CurrentNode->CurrentTimer, D + ((PacketRecieved->header.length * 8.0) / C), 0);
 				xTimerStart(CurrentNode->CurrentTimer, 0);
 				xSemaphoreTake(CurrentNode->SendDataSema, portMAX_DELAY);
 
@@ -771,7 +771,7 @@ void vRouterTask(void *pvParameters)
 			else
 			{
 	//			vTaskDelay(Tdelay); // Delay Packet after making sure its forwarded //! Redacted, Using a Timer instead
-				// xTimerChangePeriod(CurrentNode->CurrentTimer, D + ((PacketRecieved->header.length * 8.0) / C), 0);
+				xTimerChangePeriod(CurrentNode->CurrentTimer, D + ((PacketRecieved->header.length * 8.0) / C), 0);
 				xTimerStart(CurrentNode->CurrentTimer, 0);
 				xSemaphoreTake(CurrentNode->SendDataSema, portMAX_DELAY);
 				if(xQueueSend(PacketRecieved->header.reciever, &PacketRecieved, 0) != pdPASS)
