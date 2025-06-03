@@ -420,7 +420,7 @@ void vSenderTask(void *pvParameters)
 
 	if(CurrentNode->CurrentTask == Node2Task)
 	{
-		vTaskDelay(pdMS_TO_TICKS(20)); // Small delay so that both tasks dont start at the same time
+		vTaskDelay(pdMS_TO_TICKS(50)); // Small delay so that both tasks dont start at the same time
 	}
 
 	xQueueReset(CurrentNode->CurrentQueue);
@@ -510,10 +510,10 @@ void vSenderTask(void *pvParameters)
 					}
 					else
 					{
+						trace_puts("Before Free 1");
 						xSemaphoreTake(GeneratePacket, portMAX_DELAY);
 						free(PacketRecieved->data);
 						free(PacketRecieved);
-						PacketRecieved = NULL;
 						xSemaphoreGive(GeneratePacket);
 					}
 					break;
@@ -526,10 +526,10 @@ void vSenderTask(void *pvParameters)
 					}
 					else
 					{
+						trace_puts("Before Free 2");
 						xSemaphoreTake(GeneratePacket, portMAX_DELAY);
 						free(PacketRecieved->data);
 						free(PacketRecieved);
-						PacketRecieved = NULL;
 						xSemaphoreGive(GeneratePacket);
 					}
 					break;
@@ -547,6 +547,7 @@ void vSenderTask(void *pvParameters)
 																	   				QueueHandleToNum(PacketBackup->header.reciever),
 																	   				CurrentSequence,
 																	   				i + 1);
+				trace_puts("Resending Packet...");																	
 				xSemaphoreTake(GeneratePacket, portMAX_DELAY);
 				memcpy(PacketToSend->data, PacketBackup->data, sizeof(Payload_t) * (PacketBackup->header.length - sizeof(header_t)));
 				memcpy(&PacketToSend->header, &PacketBackup->header, sizeof(header_t));																
@@ -564,6 +565,7 @@ void vSenderTask(void *pvParameters)
 																				    PacketRecieved->header.sequenceNumber);
 
 				xSemaphoreTake(GeneratePacket, portMAX_DELAY);
+				trace_puts("Before Free 3");
 				free(PacketBackup->data);
 				free(PacketBackup);
 				free(PacketRecieved->data);
@@ -577,6 +579,7 @@ void vSenderTask(void *pvParameters)
 		 	trace_printf("Node %d Did not receive ACK, Skipping Packet...\n", QueueHandleToNum(CurrentNode->CurrentQueue));
 
 			xSemaphoreTake(GeneratePacket, portMAX_DELAY);
+			trace_puts("Before Free 4");
 			free(PacketBackup->data);
 		 	free(PacketBackup);
 			free(PacketRecieved->data);
@@ -627,14 +630,18 @@ void vRecieverTask(void *pvParameters)
 		else if(QueueHandleToNum(PacketRecieved->header.sender) == 255 || QueueHandleToNum(PacketRecieved->header.reciever) == 255)
 		{
 			puts("Receiver: Corrupted Packet, Dropping");
+			trace_puts("Before Free 5");
 			free(PacketRecieved->data);
 			free(PacketRecieved);
 			continue;
 		}
 
-		ReceivedData = PacketRecieved->header;
+		// ReceivedData = PacketRecieved->header;
+		memcpy(&ReceivedData, &PacketRecieved->header, sizeof(header_t));
 
 		xSemaphoreTake(GeneratePacket, portMAX_DELAY);
+		trace_puts("Before Free 6");
+		assert(PacketRecieved);
 		free(PacketRecieved->data);
 		free(PacketRecieved);
 		xSemaphoreGive(GeneratePacket);
@@ -729,6 +736,7 @@ void vRecieverTask(void *pvParameters)
 				else
 				{
 					puts("Data Corrupted");
+					trace_puts("Before Free 7");
 					free(PacketToSend->data);
 					free(PacketToSend);
 					xSemaphoreGive(GeneratePacket);
@@ -767,6 +775,7 @@ void vRouterTask(void *pvParameters)
 		if(QueueHandleToNum(PacketRecieved->header.sender) == 255 || QueueHandleToNum(PacketRecieved->header.reciever) == 255)
 		{
 			puts("ROUTER: Corrupted Packet, Dropping");
+			trace_puts("Before Free 8");
 			free(PacketRecieved->data);
 			free(PacketRecieved);
 			continue;
@@ -797,6 +806,7 @@ void vRouterTask(void *pvParameters)
 			if(checkProb(P_ack) == pdTRUE)
 			{
 				xSemaphoreTake(GeneratePacket, portMAX_DELAY);
+				trace_puts("Before Free 9");
 				free(PacketRecieved->data);
 				free(PacketRecieved);
 				xSemaphoreGive(GeneratePacket);
@@ -811,6 +821,7 @@ void vRouterTask(void *pvParameters)
 				{
 					printf("\n\nReceiver Queue Full, Router Dropped Packet...\n");
 					xSemaphoreTake(GeneratePacket, portMAX_DELAY);
+					trace_puts("Before Free 10");
 					free(PacketRecieved->data);
 					free(PacketRecieved);
 					xSemaphoreGive(GeneratePacket);
@@ -823,6 +834,7 @@ void vRouterTask(void *pvParameters)
 			if(checkProb(Pdrop) == pdTRUE)
 			{
 				xSemaphoreTake(GeneratePacket, portMAX_DELAY);
+				trace_puts("Before Free 11");
 				free(PacketRecieved->data);
 				free(PacketRecieved);
 				xSemaphoreGive(GeneratePacket);
@@ -857,6 +869,7 @@ void vRouterTask(void *pvParameters)
 		else
 		{
 			puts("ROUTER: Failed to receive packet");
+			trace_puts("Before Free 12");
 			free(PacketRecieved->data);
 			free(PacketRecieved);
 		}
@@ -909,7 +922,6 @@ static void vRouterDelayCallBack(TimerHandle_t xTimer)
 //? This is Alternative Solution for the ACK Receive and Delay, not completed
 void vACKToutCallBack(TimerHandle_t xTimer)
 {
-	trace_puts("Inside Timer Callback");
 	int timerID = (int)pvTimerGetTimerID(xTimer);
 	BaseType_t xHigherPriorityTaskWoken = pdFALSE;
 
