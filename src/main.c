@@ -42,10 +42,6 @@
 #include "timers.h"
 #include "semphr.h"	// To use semaphores
 
-#define RED 	"\033[31m"
-#define GREEN 	"\033[32m"
-#define RESET 	"\033[0m"
-
 
 #define CCM_RAM __attribute__((section(".ccmram")))
 
@@ -129,8 +125,8 @@ typedef struct {
 #define Pdrop 				( (double)0.01 )
 #define P_ack 				( (double)0.01 )
 #define P_WRONG_PACKET		( (double)0.0 )
-#define Tdelay				( pdMS_TO_TICKS(50) )
-#define D					( pdMS_TO_TICKS(5) )
+#define Tdelay				( pdMS_TO_TICKS(500) )
+#define D					( pdMS_TO_TICKS(50) )
 #define C					( (uint8_t)100 )
 #define K					( (uint16_t)40 )
 static const uint32_t	L1 = 500;
@@ -433,7 +429,7 @@ void vSenderTask(void *pvParameters)
 
 		xSemaphoreTake(GeneratePacket, portMAX_DELAY);
 			/* Generate and Send Packet when Semaphore is Taken */
-		PacketToSend = malloc(sizeof(packet));
+		PacketToSend = pvPortMalloc(sizeof(packet));
 		if(PacketToSend == NULL)
 		{
 			// Failed to Generate Packet, Trying Again
@@ -458,17 +454,17 @@ void vSenderTask(void *pvParameters)
 		CurrentSequence = PacketToSend->header.sequenceNumber;
 
 		PacketToSend->header.length = RandomNum(L1, L2);
-		PacketToSend->data = calloc(PacketToSend->header.length - sizeof(header_t), sizeof(Payload_t));
+		PacketToSend->data = pvPortMalloc((PacketToSend->header.length - sizeof(header_t)) * sizeof(Payload_t));
 		if(PacketToSend->data == NULL)
 		{
 			trace_puts("Failed to allocate data");
-			free(PacketToSend);
+			vPortFree(PacketToSend);
 			continue;
 		}
 
 			/* Store A Backup of the Data transmitted in case of retransmission */
-		PacketBackup = (packet*)malloc(sizeof(packet));
-		PacketBackup->data = (Payload_t*)calloc(PacketToSend->header.length - sizeof(header_t), sizeof(Payload_t));
+		PacketBackup = (packet*)pvPortMalloc(sizeof(packet));
+		PacketBackup->data = (Payload_t*)pvPortMalloc((PacketToSend->header.length - sizeof(header_t)) * sizeof(Payload_t));
 		memcpy(PacketBackup->data, PacketToSend->data, sizeof(Payload_t) * (PacketToSend->header.length - sizeof(header_t)));
 		memcpy(&PacketBackup->header, &PacketToSend->header, sizeof(header_t));
 
@@ -512,8 +508,8 @@ void vSenderTask(void *pvParameters)
 					{
 						trace_puts("Before Free 1");
 						xSemaphoreTake(GeneratePacket, portMAX_DELAY);
-						free(PacketRecieved->data);
-						free(PacketRecieved);
+						vPortFree(PacketRecieved->data);
+						vPortFree(PacketRecieved);
 						xSemaphoreGive(GeneratePacket);
 					}
 					break;
@@ -528,8 +524,8 @@ void vSenderTask(void *pvParameters)
 					{
 						trace_puts("Before Free 2");
 						xSemaphoreTake(GeneratePacket, portMAX_DELAY);
-						free(PacketRecieved->data);
-						free(PacketRecieved);
+						vPortFree(PacketRecieved->data);
+						vPortFree(PacketRecieved);
 						xSemaphoreGive(GeneratePacket);
 					}
 					break;
@@ -549,6 +545,8 @@ void vSenderTask(void *pvParameters)
 																	   				i + 1);
 				trace_puts("Resending Packet...");																	
 				xSemaphoreTake(GeneratePacket, portMAX_DELAY);
+				PacketToSend = pvPortMalloc(sizeof(packet));
+				PacketToSend->data = pvPortMalloc((PacketBackup->header.length - sizeof(header_t)));
 				memcpy(PacketToSend->data, PacketBackup->data, sizeof(Payload_t) * (PacketBackup->header.length - sizeof(header_t)));
 				memcpy(&PacketToSend->header, &PacketBackup->header, sizeof(header_t));																
 			 	xQueueSend(RouterQueue, &PacketToSend, portMAX_DELAY);
@@ -566,10 +564,10 @@ void vSenderTask(void *pvParameters)
 
 				xSemaphoreTake(GeneratePacket, portMAX_DELAY);
 				trace_puts("Before Free 3");
-				free(PacketBackup->data);
-				free(PacketBackup);
-				free(PacketRecieved->data);
-				free(PacketRecieved);
+				vPortFree(PacketBackup->data);
+				vPortFree(PacketBackup);
+				vPortFree(PacketRecieved->data);
+				vPortFree(PacketRecieved);
 				xSemaphoreGive(GeneratePacket);
 
 		 	trace_puts("Packet Sent Successfully, Sending Next Packet!");
@@ -580,10 +578,10 @@ void vSenderTask(void *pvParameters)
 
 			xSemaphoreTake(GeneratePacket, portMAX_DELAY);
 			trace_puts("Before Free 4");
-			free(PacketBackup->data);
-		 	free(PacketBackup);
-			free(PacketRecieved->data);
-			free(PacketRecieved);
+			vPortFree(PacketBackup->data);
+		 	vPortFree(PacketBackup);
+			vPortFree(PacketRecieved->data);
+			vPortFree(PacketRecieved);
 			xSemaphoreGive(GeneratePacket);
 		 }
 
@@ -631,27 +629,27 @@ void vRecieverTask(void *pvParameters)
 		{
 			puts("Receiver: Corrupted Packet, Dropping");
 			trace_puts("Before Free 5");
-			free(PacketRecieved->data);
-			free(PacketRecieved);
+			vPortFree(PacketRecieved->data);
+			vPortFree(PacketRecieved);
 			continue;
 		}
+
+		// Display Received Packets
+		trace_printf("\n\nNode %d: Received %d from %d to %d No #%d\n", QueueHandleToNum(CurrentNode->CurrentQueue),
+																  	  	PacketRecieved->header.length,
+																  	  	QueueHandleToNum(PacketRecieved->header.sender),
+																	  	QueueHandleToNum(PacketRecieved->header.reciever),
+																  	  	PacketRecieved->header.sequenceNumber);
 
 		// ReceivedData = PacketRecieved->header;
 		memcpy(&ReceivedData, &PacketRecieved->header, sizeof(header_t));
 
 		xSemaphoreTake(GeneratePacket, portMAX_DELAY);
 		trace_puts("Before Free 6");
-		assert(PacketRecieved);
-		free(PacketRecieved->data);
-		free(PacketRecieved);
+		vPortFree(PacketRecieved->data);
+		vPortFree(PacketRecieved);
 		xSemaphoreGive(GeneratePacket);
 
-		// Display Received Packets
-		trace_printf("\n\nNode %d: Received %d from %d to %d No #%d\n", QueueHandleToNum(CurrentNode->CurrentQueue),
-																  	  	ReceivedData.length,
-																  	  	QueueHandleToNum(ReceivedData.sender),
-																	  	QueueHandleToNum(ReceivedData.reciever),
-																  	  	ReceivedData.sequenceNumber);
 
 
 		// Checks if the Received Packets are meant for the Current Node
@@ -705,7 +703,7 @@ void vRecieverTask(void *pvParameters)
 
 				xSemaphoreTake(GeneratePacket, portMAX_DELAY);
 
-				PacketToSend = malloc(sizeof(packet));
+				PacketToSend = pvPortMalloc(sizeof(packet));
 				if(PacketToSend == NULL)
 				{
 					// Failed to Generate Packet, Trying Again
@@ -717,12 +715,12 @@ void vRecieverTask(void *pvParameters)
 				PacketToSend->header.reciever = ReceivedData.sender;
 				PacketToSend->header.sequenceNumber = ReceivedData.sequenceNumber;
 				PacketToSend->header.length = K;
-				PacketToSend->data = calloc(PacketToSend->header.length - sizeof(header_t), sizeof(Payload_t));
+				PacketToSend->data = pvPortMalloc((PacketToSend->header.length - sizeof(header_t)) * sizeof(Payload_t));
 				if(PacketToSend->data == NULL)
 				{
 					// Failed to Generate Packet, Trying Again
 					trace_puts("Failed to Allocate ACK Data");
-					free(PacketToSend);
+					vPortFree(PacketToSend);
 					continue;
 				}
 
@@ -735,10 +733,8 @@ void vRecieverTask(void *pvParameters)
 					xQueueSend(RouterQueue, &PacketToSend, portMAX_DELAY); // Send ACK
 				else
 				{
-					puts("Data Corrupted");
+					printf("Receiver %d: Data Corrupted", QueueHandleToNum(CurrentNode->CurrentQueue));
 					trace_puts("Before Free 7");
-					free(PacketToSend->data);
-					free(PacketToSend);
 					xSemaphoreGive(GeneratePacket);
 					continue;
 				}
@@ -776,8 +772,8 @@ void vRouterTask(void *pvParameters)
 		{
 			puts("ROUTER: Corrupted Packet, Dropping");
 			trace_puts("Before Free 8");
-			free(PacketRecieved->data);
-			free(PacketRecieved);
+			vPortFree(PacketRecieved->data);
+			vPortFree(PacketRecieved);
 			continue;
 		}
 
@@ -807,8 +803,8 @@ void vRouterTask(void *pvParameters)
 			{
 				xSemaphoreTake(GeneratePacket, portMAX_DELAY);
 				trace_puts("Before Free 9");
-				free(PacketRecieved->data);
-				free(PacketRecieved);
+				vPortFree(PacketRecieved->data);
+				vPortFree(PacketRecieved);
 				xSemaphoreGive(GeneratePacket);
 				printf("\n\nRouter Dropped ACK...\n");
 			}
@@ -822,8 +818,8 @@ void vRouterTask(void *pvParameters)
 					printf("\n\nReceiver Queue Full, Router Dropped Packet...\n");
 					xSemaphoreTake(GeneratePacket, portMAX_DELAY);
 					trace_puts("Before Free 10");
-					free(PacketRecieved->data);
-					free(PacketRecieved);
+					vPortFree(PacketRecieved->data);
+					vPortFree(PacketRecieved);
 					xSemaphoreGive(GeneratePacket);
 					PacketRecieved = NULL;
 				}
@@ -835,8 +831,8 @@ void vRouterTask(void *pvParameters)
 			{
 				xSemaphoreTake(GeneratePacket, portMAX_DELAY);
 				trace_puts("Before Free 11");
-				free(PacketRecieved->data);
-				free(PacketRecieved);
+				vPortFree(PacketRecieved->data);
+				vPortFree(PacketRecieved);
 				xSemaphoreGive(GeneratePacket);
 				trace_printf("\n\nRouter Dropped Packet...\n");
 			}
@@ -870,8 +866,8 @@ void vRouterTask(void *pvParameters)
 		{
 			puts("ROUTER: Failed to receive packet");
 			trace_puts("Before Free 12");
-			free(PacketRecieved->data);
-			free(PacketRecieved);
+			vPortFree(PacketRecieved->data);
+			vPortFree(PacketRecieved);
 		}
 	}
 }
