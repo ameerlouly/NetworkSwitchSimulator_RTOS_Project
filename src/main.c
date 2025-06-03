@@ -407,7 +407,7 @@ void vSenderTask(void *pvParameters)
 
 		xSemaphoreTake(GeneratePacket, portMAX_DELAY);
 
-		PacketToSend = pvPortMalloc(sizeof(packet));
+		PacketToSend = malloc(sizeof(packet));
 		if(PacketToSend == NULL)
 		{
 			// Failed to Generate Packet, Trying Again
@@ -436,8 +436,6 @@ void vSenderTask(void *pvParameters)
 		if(PacketToSend->data == NULL)
 		{
 			trace_puts("Failed to allocate data");
-			free(PacketToSend->data);
-			vPortFree(PacketToSend);
 			continue;
 		}
 
@@ -478,7 +476,7 @@ void vSenderTask(void *pvParameters)
 					break;
 					
 					case 4:
-					if(PacketRecieved->header.sequenceNumber == SequenceToNode3)
+					if(PacketRecieved->header.sequenceNumber == SequenceToNode4)
 					{
 						ACK_recieved = 1;
 					}
@@ -510,9 +508,9 @@ void vSenderTask(void *pvParameters)
 
 				xSemaphoreTake(GeneratePacket, portMAX_DELAY);
 				free(PacketBackup->data);
-				vPortFree(PacketBackup);
+				free(PacketBackup);
 				free(PacketRecieved->data);
-				vPortFree(PacketRecieved);
+				free(PacketRecieved);
 				xSemaphoreGive(GeneratePacket);
 
 		 	trace_puts("Packet Sent Successfully, Sending Next Packet!");
@@ -525,9 +523,9 @@ void vSenderTask(void *pvParameters)
 
 			xSemaphoreTake(GeneratePacket, portMAX_DELAY);
 			free(PacketBackup->data);
-		 	vPortFree(PacketBackup);
+		 	free(PacketBackup);
 			free(PacketRecieved->data);
-			vPortFree(PacketRecieved);
+			free(PacketRecieved);
 			xSemaphoreGive(GeneratePacket);
 
 			xQueueReset(CurrentNode->CurrentQueue);
@@ -576,7 +574,7 @@ void vRecieverTask(void *pvParameters)
 
 		xSemaphoreTake(GeneratePacket, portMAX_DELAY);
 		free(PacketRecieved->data);
-		vPortFree(PacketRecieved);
+		free(PacketRecieved);
 		xSemaphoreGive(GeneratePacket);
 
 		// Display Received Packets
@@ -623,7 +621,7 @@ void vRecieverTask(void *pvParameters)
 
 			xSemaphoreTake(GeneratePacket, portMAX_DELAY);
 			free(PacketRecieved->data);
-			vPortFree(PacketRecieved);
+			free(PacketRecieved);
 			xSemaphoreGive(GeneratePacket);
 
 // 			// Suspend Current Task if it has received 2000 or more Packets
@@ -647,13 +645,13 @@ void vRecieverTask(void *pvParameters)
 			{
 				xSemaphoreTake(GeneratePacket, portMAX_DELAY);
 
-				PacketToSend = pvPortMalloc(sizeof(packet));
+				PacketToSend = malloc(sizeof(packet));
 				if(PacketToSend == NULL)
 				{
 					// Failed to Generate Packet, Trying Again
 					trace_puts("Failed to Allocate ACK");
 					free(PacketToSend->data);
-					vPortFree(PacketToSend);
+					free(PacketToSend);
 					continue;
 				}
 
@@ -667,7 +665,7 @@ void vRecieverTask(void *pvParameters)
 					// Failed to Generate Packet, Trying Again
 					trace_puts("Failed to Allocate ACK Data");
 					free(PacketToSend->data);
-					vPortFree(PacketToSend);
+					free(PacketToSend);
 					continue;
 				}
 
@@ -689,7 +687,7 @@ void vRecieverTask(void *pvParameters)
 			
 			xSemaphoreTake(GeneratePacket, portMAX_DELAY);
 			free(PacketRecieved->data);
-			vPortFree(PacketRecieved);
+			free(PacketRecieved);
 			xSemaphoreGive(GeneratePacket);
 			WrongPackets++;
 		}
@@ -863,8 +861,8 @@ static void vRouterDelayCallBack(TimerHandle_t xTimer)
 
 void vApplicationMallocFailedHook( void )
 {
-	/* Called if a call to pvPortMalloc() fails because there is insufficient
-	free memory available in the FreeRTOS heap.  pvPortMalloc() is called
+	/* Called if a call to malloc() fails because there is insufficient
+	free memory available in the FreeRTOS heap.  malloc() is called
 	internally by FreeRTOS API functions that create tasks, queues, software
 	timers, and semaphores.  The size of the FreeRTOS heap is set by the
 	configTOTAL_HEAP_SIZE configuration constant in FreeRTOSConfig.h. */
