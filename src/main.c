@@ -614,10 +614,11 @@ void vSenderTask(void *pvParameters)
 		printf("\n\n\n\n-------NODE %d STATISTICS--------\n", QueueHandleToNum(CurrentNode->CurrentQueue));
 		printf("Total Packets Sent: %d\n", totalSent);
 		printf("Total ACKs Received: %d\n", totalACKsReceived);
-		printf("Total Packets Dropped: %d\n", totalDropped);
+		printf("Total Packets Dropped: %d\n\n", totalDropped);
 		printf("Bytes Sent: %d\n", BytesSent);
 		printf("Bytes Successful: %d\n", BytesSuccess);
-		printf("Bytes Failed: %d\n\n\n", BytesFailed);
+		printf("Bytes Failed: %d\n", BytesFailed);
+		puts("------------------------------------------\n\n\n\n\n");
 
 		if(totalSent == 4100)
 		{
