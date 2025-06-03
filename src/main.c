@@ -116,6 +116,7 @@ typedef struct {
 	TimerHandle_t CurrentTimer;
 	TimerHandle_t ACKToutTimer;
 	SemaphoreHandle_t SendDataSema;
+	SemaphoreHandle_t ACK_Tout;
 } NodeType_t;
 
 /** End of Type Declarations ***************************************************/
@@ -141,7 +142,7 @@ static const uint32_t	L2 = 1500;
 
 static void vSenderTimerCallBack(TimerHandle_t xTimer);
 static void vRouterDelayCallBack(TimerHandle_t xTimer);
-//void vACKToutCallBack(TimerHandle_t xTimer);
+void vACKToutCallBack(TimerHandle_t xTimer);
 
 /** End of Timer CallBacks Prototypes *****************************************/
 
@@ -152,7 +153,8 @@ TimerHandle_t tNode2_Sender = NULL;
 
 TimerHandle_t tRouterDelay = NULL;
 
-//TimerHandle_t	tNode1_ACKTout = NULL;
+TimerHandle_t	tNode1_ACKTout = NULL;
+TimerHandle_t	tNode2_ACKTout = NULL;
 
 /** End of Timer Handles ******************************************************/
 
@@ -168,6 +170,9 @@ SemaphoreHandle_t HandleToNum;
 SemaphoreHandle_t GeneratePacket;
 
 SemaphoreHandle_t StopTransmission;
+
+SemaphoreHandle_t Node1ACKReceive;
+SemaphoreHandle_t Node2ACKReceive;
 
 /** End of Semaphore Handles **************************************************/
 
@@ -294,11 +299,16 @@ int main(int argc, char* argv[])
 								pdFALSE,
 								(void*)1,
 								vRouterDelayCallBack);
-//	tNode1_ACKTout = xTimerCreate("Node 1 Tou",
-//								 Tout,
-//								 pdFALSE,
-//								 (void*)1,
-//								 vACKToutCallBack);
+	tNode1_ACKTout = xTimerCreate("Node 1 Tout",
+								 Tout,
+								 pdFALSE,
+								 (void*)1,
+								 vACKToutCallBack);
+	tNode2_ACKTout = xTimerCreate("Node 2 Tout",
+								 Tout,
+								 pdFALSE,
+								 (void*)1,
+								 vACKToutCallBack);
 //	xTimerStart(tNode1_Sender, 0);
 //	if(tNode1_Sender == NULL)
 //	{
@@ -333,14 +343,20 @@ int main(int argc, char* argv[])
 	StopTransmission = xSemaphoreCreateMutex();
 	xSemaphoreTake(StopTransmission, 0);
 
+	Node1ACKReceive = xSemaphoreCreateBinary();
+	xSemaphoreTake(Node1ACKReceive, 0);
+
+	Node2ACKReceive = xSemaphoreCreateBinary();
+	xSemaphoreTake(Node2ACKReceive, 0);
+
 	/** Node Types Definitions ****************************************************/
 
-//					   {Task Handle, Queue Handle, SenderTimer, ACKTout Timer, SendData Semaphore}
-	NodeType_t Node1 = {Node1Task, Node1Queue, tNode1_Sender, NULL,Node1SendData};
-	NodeType_t Node2 = {Node2Task, Node2Queue, tNode2_Sender, NULL, Node2SendData};
-	NodeType_t Node3 = {Node3Task, Node3Queue, NULL, NULL, NULL};
-	NodeType_t Node4 = {Node4Task, Node4Queue, NULL, NULL, NULL};
-	NodeType_t Router = {RouterTask, RouterQueue, tRouterDelay, NULL, RouterTransmit};
+//					   {Task Handle, Queue Handle, SenderTimer, ACKTout Timer, SendData Semaphore, ACK Sema}
+	NodeType_t Node1 = {Node1Task, Node1Queue, tNode1_Sender, tNode1_ACKTout,Node1SendData, Node1ACKReceive};
+	NodeType_t Node2 = {Node2Task, Node2Queue, tNode2_Sender, tNode2_ACKTout, Node2SendData, Node2ACKReceive};
+	NodeType_t Node3 = {Node3Task, Node3Queue, NULL, NULL, NULL, NULL};
+	NodeType_t Node4 = {Node4Task, Node4Queue, NULL, NULL, NULL, NULL};
+	NodeType_t Router = {RouterTask, RouterQueue, tRouterDelay, NULL, RouterTransmit, NULL};
 
 	/** End of Node Types Definitions *********************************************/
 	if(		Node1Queue != NULL &&
@@ -479,10 +495,12 @@ void vSenderTask(void *pvParameters)
 		uint8_t ACK_recieved = 0;
 		for(int i = 0; i < NUM_OF_TRIES; i++)
 		{
-			 status = xQueueReceive(CurrentNode->CurrentQueue, &PacketRecieved, Tout);
-			 if(status == pdPASS)
-			 {
-			 	switch(QueueHandleToNum(PacketRecieved->header.sender))
+			xTimerStart(CurrentNode->ACKToutTimer, 0);
+			xSemaphoreTake(CurrentNode->ACK_Tout, portMAX_DELAY);
+			status = xQueueReceive(CurrentNode->CurrentQueue, &PacketRecieved, 0);
+			if(status == pdPASS)
+			{
+				switch(QueueHandleToNum(PacketRecieved->header.sender))
 				{
 					case 3:
 					if(PacketRecieved->header.sequenceNumber >= SequenceToNode3)
@@ -522,10 +540,10 @@ void vSenderTask(void *pvParameters)
 					totalACKs++;
 					break;
 				}
-			 }
-			 else
-			 {
-			 	trace_printf("Node %d: Awaiting ACK from %d No #%i, Attempt #%d\n", QueueHandleToNum(CurrentNode->CurrentQueue),
+			}
+			else
+			{
+				trace_printf("Node %d: Awaiting ACK from %d No #%i, Attempt #%d\n", QueueHandleToNum(CurrentNode->CurrentQueue),
 																	   				QueueHandleToNum(PacketBackup->header.reciever),
 																	   				CurrentSequence,
 																	   				i + 1);
@@ -534,7 +552,7 @@ void vSenderTask(void *pvParameters)
 				memcpy(&PacketToSend->header, &PacketBackup->header, sizeof(header_t));																
 			 	xQueueSend(RouterQueue, &PacketToSend, portMAX_DELAY);
 				xSemaphoreGive(GeneratePacket);
-			 }
+			}
 		}
 
 		 if(ACK_recieved == 1)
@@ -566,8 +584,8 @@ void vSenderTask(void *pvParameters)
 			xSemaphoreGive(GeneratePacket);
 		 }
 
-		//  trace_printf("--Sender Node %d Statistics--\n", QueueHandleToNum(CurrentNode->CurrentQueue));
-		//  trace_printf("Sent: %d, ACKs: %d\n\n", totalSent, totalACKs);
+		// //  trace_printf("--Sender Node %d Statistics--\n", QueueHandleToNum(CurrentNode->CurrentQueue));
+		// //  trace_printf("Sent: %d, ACKs: %d\n\n", totalSent, totalACKs);
 	}
 }
 
@@ -889,32 +907,27 @@ static void vRouterDelayCallBack(TimerHandle_t xTimer)
 //!		/**		ACK Part (Commented Out for Phase 1)	**/
 
 //? This is Alternative Solution for the ACK Receive and Delay, not completed
-//void vACKToutCallBack(TimerHandle_t xTimer)
-//{
-//	trace_puts("Inside Timer Callback");
-//	int timerID = (int)pvTimerGetTimerID(xTimer);
-//	BaseType_t xHigherPriorityTaskWoken = pdFALSE;
-//
-//	BaseType_t status = pdFAIL;
-//
-//	packet PacketRecieved;
-//
-//	switch(timerID)
-//	{
-//	case 1:
-//		status = xQueueReceiveFromISR(Node1Queue, &PacketRecieved, xHigherPriorityTaskWoken);
-//		if(status == pdPASS)
-//		{
-//			xSemaphoreGiveFromISR(Node1DataSent, xHigherPriorityTaskWoken);
-//		}
-//		break;
-//	}
-//
-//	if(xHigherPriorityTaskWoken)
-//	{
-//		portYIELD_FROM_ISR(xHigherPriorityTaskWoken);
-//	}
-//}
+void vACKToutCallBack(TimerHandle_t xTimer)
+{
+	trace_puts("Inside Timer Callback");
+	int timerID = (int)pvTimerGetTimerID(xTimer);
+	BaseType_t xHigherPriorityTaskWoken = pdFALSE;
+
+	switch(timerID)
+	{
+	case 1:
+		xSemaphoreGiveFromISR(Node1ACKReceive ,&xHigherPriorityTaskWoken);
+		break;
+	case 2:
+		xSemaphoreGiveFromISR(Node2ACKReceive ,&xHigherPriorityTaskWoken);
+		break;
+	}
+
+	if(xHigherPriorityTaskWoken)
+	{
+		portYIELD_FROM_ISR(xHigherPriorityTaskWoken);
+	}
+}
 
 
 /** End of Timer CallBacks Definitions ****************************************/
