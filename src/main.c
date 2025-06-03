@@ -463,8 +463,8 @@ void vSenderTask(void *pvParameters)
 		}
 
 			/* Store A Backup of the Data transmitted in case of retransmission */
-		PacketBackup = (packet*)pvPortMalloc(sizeof(packet));
-		PacketBackup->data = (Payload_t*)pvPortMalloc((PacketToSend->header.length - sizeof(header_t)) * sizeof(Payload_t));
+		PacketBackup = pvPortMalloc(sizeof(packet));
+		PacketBackup->data = pvPortMalloc((PacketToSend->header.length - sizeof(header_t)) * sizeof(Payload_t));
 		memcpy(PacketBackup->data, PacketToSend->data, sizeof(Payload_t) * (PacketToSend->header.length - sizeof(header_t)));
 		memcpy(&PacketBackup->header, &PacketToSend->header, sizeof(header_t));
 
@@ -550,7 +550,7 @@ void vSenderTask(void *pvParameters)
 				trace_puts("Resending Packet...");																	
 				xSemaphoreTake(GeneratePacket, portMAX_DELAY);
 				PacketToSend = pvPortMalloc(sizeof(packet));
-				PacketToSend->data = pvPortMalloc((PacketBackup->header.length - sizeof(header_t)));
+				PacketToSend->data = pvPortMalloc((PacketBackup->header.length - sizeof(header_t)) * sizeof(Payload_t));
 				memcpy(PacketToSend->data, PacketBackup->data, sizeof(Payload_t) * (PacketBackup->header.length - sizeof(header_t)));
 				memcpy(&PacketToSend->header, &PacketBackup->header, sizeof(header_t));																
 			 	xQueueSend(RouterQueue, &PacketToSend, portMAX_DELAY);
@@ -719,7 +719,7 @@ void vRecieverTask(void *pvParameters)
 				PacketToSend->header.reciever = ReceivedData.sender;
 				PacketToSend->header.sequenceNumber = ReceivedData.sequenceNumber;
 				PacketToSend->header.length = K;
-				PacketToSend->data = pvPortMalloc((PacketToSend->header.length - sizeof(header_t)) * sizeof(Payload_t));
+				PacketToSend->data = pvPortMalloc((K - sizeof(header_t)) * sizeof(Payload_t));
 				if(PacketToSend->data == NULL)
 				{
 					// Failed to Generate Packet, Trying Again
