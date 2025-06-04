@@ -127,11 +127,11 @@ typedef struct {
 #define Pdrop 				( (double)0.01 )
 #define P_ack 				( (double)0.01 )
 #define P_WRONG_PACKET		( (double)0.0 )
-#define Tdelay				( pdMS_TO_TICKS(500) )
+#define Tdelay				( pdMS_TO_TICKS(50) )
 #define D					( pdMS_TO_TICKS(5) )
 #define C					( (uint32_t)100000 )
 #define K					( (uint16_t)40 )
-#define N					( (uint8_t)2 )
+#define N					( (uint8_t)1 )
 static const uint32_t	L1 = 500;
 static const uint32_t	L2 = 1500;
 
@@ -373,7 +373,7 @@ int main(int argc, char* argv[])
 	{
 		// Creating Tasks
 		status = xTaskCreate(vSenderTask, "Node 1", 512, (void*)&Node1, 1, &Node1Task);
-		status &= xTaskCreate(vSenderTask, "Node 2", 512, (void*)&Node2, 1, &Node2Task);
+		// status &= xTaskCreate(vSenderTask, "Node 2", 512, (void*)&Node2, 1, &Node2Task);
 		status &= xTaskCreate(vRecieverTask, "Node 3", 512, (void*)&Node3, 2, &Node3Task);
 		status &= xTaskCreate(vRecieverTask, "Node 4", 512, (void*)&Node4, 2, &Node4Task);
 		status &= xTaskCreate(vRouterTask, "Router", 512, (void*)&Router, 3, &RouterTask);
@@ -575,14 +575,14 @@ void vSenderTask(void *pvParameters)
 				trace_puts("Resending Packet...");
 				for(int k = j; k < N; k++)
 				{																
-				xSemaphoreTake(GeneratePacket, portMAX_DELAY);
-				NumOfTries++;
-				PacketToSend = pvPortMalloc(sizeof(packet));
-				PacketToSend->data = pvPortMalloc((PacketBackup[k]->header.length - sizeof(header_t)) * sizeof(Payload_t));
-				memcpy(PacketToSend->data, PacketBackup[k]->data, sizeof(Payload_t) * (PacketBackup[k]->header.length - sizeof(header_t)));
-				memcpy(&PacketToSend->header, &PacketBackup[k]->header, sizeof(header_t));																
-			 	xQueueSend(RouterQueue, &PacketToSend, portMAX_DELAY);
-				xSemaphoreGive(GeneratePacket);
+					xSemaphoreTake(GeneratePacket, portMAX_DELAY);
+					NumOfTries++;
+					PacketToSend = pvPortMalloc(sizeof(packet));
+					PacketToSend->data = pvPortMalloc((PacketBackup[k]->header.length - sizeof(header_t)) * sizeof(Payload_t));
+					memcpy(PacketToSend->data, PacketBackup[k]->data, sizeof(Payload_t) * (PacketBackup[k]->header.length - sizeof(header_t)));
+					memcpy(&PacketToSend->header, &PacketBackup[k]->header, sizeof(header_t));
+					xQueueSend(RouterQueue, &PacketToSend, portMAX_DELAY);
+					xSemaphoreGive(GeneratePacket);
 				}
 			}
 			}
@@ -604,7 +604,7 @@ void vSenderTask(void *pvParameters)
 			for(int i = 0; i < N; i++)
 			{
 				vPortFree(PacketBackup[i]->data);
-				vPortFree(PacketBackup);
+				vPortFree(PacketBackup[i]);
 			}
 			vPortFree(PacketRecieved->data);
 			vPortFree(PacketRecieved);
@@ -623,7 +623,7 @@ void vSenderTask(void *pvParameters)
 			for(int i = 0; i < N; i++)
 			{
 				vPortFree(PacketBackup[i]->data);
-				vPortFree(PacketBackup);
+				vPortFree(PacketBackup[i]);
 			}
 			
 			totalDropped++;
