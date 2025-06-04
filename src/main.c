@@ -123,7 +123,7 @@ typedef struct {
 
 #define T1 					( pdMS_TO_TICKS(100) )
 #define T2 					( pdMS_TO_TICKS(200) )
-#define Tout 				( pdMS_TO_TICKS(225) )	// 150, 175, 200, 225
+#define Tout 				( pdMS_TO_TICKS(200) )	// 150, 175, 200, 225
 #define Pdrop 				( (double)0.01 )		// 0.01, 0.02, 0.04, 0.08
 #define P_ack 				( (double)0.01 )
 #define P_WRONG_PACKET		( (double)0.0 )
@@ -323,11 +323,11 @@ int main(int argc, char* argv[])
 //	}
 
 	/** Creating Queues **/
-	Node1Queue = xQueueCreate(10, sizeof(packet*));
-	Node2Queue = xQueueCreate(10, sizeof(packet*));
-	Node3Queue = xQueueCreate(10, sizeof(packet*));
-	Node4Queue = xQueueCreate(10, sizeof(packet*));
-	RouterQueue = xQueueCreate(20, sizeof(packet*));
+	Node1Queue = xQueueCreate(20, sizeof(packet*));
+	Node2Queue = xQueueCreate(20, sizeof(packet*));
+	Node3Queue = xQueueCreate(20, sizeof(packet*));
+	Node4Queue = xQueueCreate(20, sizeof(packet*));
+	RouterQueue = xQueueCreate(40, sizeof(packet*));
 	// RouterACKQueue = xQueueCreate(10, sizeof(packet*));
 
 	/** Creating Semaphores **/
@@ -373,7 +373,7 @@ int main(int argc, char* argv[])
 	{
 		// Creating Tasks
 		status = xTaskCreate(vSenderTask, "Node 1", 512, (void*)&Node1, 1, &Node1Task);
-		status &= xTaskCreate(vSenderTask, "Node 2", 512, (void*)&Node2, 1, &Node2Task);
+		// status &= xTaskCreate(vSenderTask, "Node 2", 512, (void*)&Node2, 1, &Node2Task);
 		status &= xTaskCreate(vRecieverTask, "Node 3", 512, (void*)&Node3, 2, &Node3Task);
 		status &= xTaskCreate(vRecieverTask, "Node 4", 512, (void*)&Node4, 2, &Node4Task);
 		status &= xTaskCreate(vRouterTask, "Router", 512, (void*)&Router, 3, &RouterTask);
@@ -443,6 +443,7 @@ void vSenderTask(void *pvParameters)
 		
 		xTimerStart(CurrentNode->CurrentTimer, 0);
 		xSemaphoreTake(CurrentNode->SendDataSema, portMAX_DELAY);	// Dont Start Sending Data until allowed; Sema = 0
+		uint8_t CurrentReceiver = RandomNum(3, 4);
 
 		for(int i = 0; i < N; i++)
 		{
@@ -458,7 +459,7 @@ void vSenderTask(void *pvParameters)
 			}
 
 			PacketToSend->header.sender = CurrentNode->CurrentQueue;
-			switch(RandomNum(3, 4))
+			switch(CurrentReceiver)
 			{
 			case 3:
 				PacketToSend->header.reciever = Node3Queue;
@@ -481,7 +482,7 @@ void vSenderTask(void *pvParameters)
 			}
 
 				/* Store A Data in buffer till ACK is Recieved */
-			CurrentSequence = PacketToSend->header.sequenceNumber;
+			// CurrentSequence = PacketToSend->header.sequenceNumber;
 			PacketBackup[i] = pvPortMalloc(sizeof(packet));
 			PacketBackup[i]->data = pvPortMalloc((PacketToSend->header.length - sizeof(header_t)) * sizeof(Payload_t));
 			memcpy(PacketBackup[i]->data, PacketToSend->data, sizeof(Payload_t) * (PacketToSend->header.length - sizeof(header_t)));
@@ -491,7 +492,7 @@ void vSenderTask(void *pvParameters)
 			trace_printf("Node %d: Sending %d to %d No #%d\n", QueueHandleToNum(CurrentNode->CurrentQueue),
 															PacketToSend->header.length,
 															QueueHandleToNum(PacketToSend->header.reciever),
-															CurrentSequence);
+															PacketToSend->header.sequenceNumber);
 												
 			if(xQueueSend(RouterQueue, &PacketToSend, portMAX_DELAY) == pdPASS)
 			{
