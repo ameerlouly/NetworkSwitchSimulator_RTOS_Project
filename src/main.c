@@ -515,89 +515,91 @@ void vSenderTask(void *pvParameters)
 			for(int j = 0; j < N; j++)
 			{
 				ACK_recieved = 0;
-			xTimerStart(CurrentNode->ACKToutTimer, 0);
-			xSemaphoreTake(CurrentNode->ACK_Sema, portMAX_DELAY);
-			status = xQueueReceive(CurrentNode->CurrentQueue, &PacketRecieved, 0);
-			if(status == pdPASS)
-			{
-				switch(QueueHandleToNum(PacketRecieved->header.sender))
+				xTimerStart(CurrentNode->ACKToutTimer, 0);
+				xSemaphoreTake(CurrentNode->ACK_Sema, portMAX_DELAY);
+				status = xQueueReceive(CurrentNode->CurrentQueue, &PacketRecieved, 0);
+				if(status == pdPASS)
 				{
-					case 3:
-					if(PacketRecieved->header.sequenceNumber >= PacketBackup[j]->header.sequenceNumber)
+					switch(QueueHandleToNum(PacketRecieved->header.sender))
 					{
-						// SequenceToNode3 = PacketRecieved->header.sequenceNumber;
-						BytesSuccess += PacketBackup[j]->header.length;
-						ACK_recieved = 1;
+						case 3:
+						if(PacketRecieved->header.sequenceNumber >= PacketBackup[j]->header.sequenceNumber)
+						{
+							// SequenceToNode3 = PacketRecieved->header.sequenceNumber;
+							BytesSuccess += PacketBackup[j]->header.length;
+							totalACKsReceived++;
+							ACK_recieved = 1;
+							xSemaphoreTake(GeneratePacket, portMAX_DELAY);
+							vPortFree(PacketRecieved->data);
+							vPortFree(PacketRecieved);
+							xSemaphoreGive(GeneratePacket);
+						}
+						else
+						{
+							// In case of recieving an old ACK from a previous packet
+							// trace_puts("Before Free 1");
+							xSemaphoreTake(GeneratePacket, portMAX_DELAY);
+							vPortFree(PacketRecieved->data);
+							vPortFree(PacketRecieved);
+							xSemaphoreGive(GeneratePacket);
+							continue;
+						}
+						break;
+						
+						case 4:
+						if(PacketRecieved->header.sequenceNumber >= PacketBackup[j]->header.sequenceNumber)
+						{
+							// SequenceToNode4 = PacketRecieved->header.sequenceNumber;
+							BytesSuccess += PacketBackup[j]->header.length;
+							totalACKsReceived++;
+							ACK_recieved = 1;
+							xSemaphoreTake(GeneratePacket, portMAX_DELAY);
+							vPortFree(PacketRecieved->data);
+							vPortFree(PacketRecieved);
+							xSemaphoreGive(GeneratePacket);
+						}
+						else
+						{
+							// In case of recieving an old ACK from a previous packet
+							// trace_puts("Before Free 2");
+							xSemaphoreTake(GeneratePacket, portMAX_DELAY);
+							vPortFree(PacketRecieved->data);
+							vPortFree(PacketRecieved);
+							xSemaphoreGive(GeneratePacket);
+							continue;
+						}
+						break;
 					}
-					else
-					{
-						// In case of recieving an old ACK from a previous packet
-						// trace_puts("Before Free 1");
-						xSemaphoreTake(GeneratePacket, portMAX_DELAY);
-						vPortFree(PacketRecieved->data);
-						vPortFree(PacketRecieved);
-						xSemaphoreGive(GeneratePacket);
-						continue;
-					}
-					break;
-					
-					case 4:
-					if(PacketRecieved->header.sequenceNumber >= PacketBackup[j]->header.sequenceNumber)
-					{
-						// SequenceToNode4 = PacketRecieved->header.sequenceNumber;
-						BytesSuccess += PacketBackup[j]->header.length;
-						ACK_recieved = 1;
-					}
-					else
-					{
-						// In case of recieving an old ACK from a previous packet
-						// trace_puts("Before Free 2");
-						xSemaphoreTake(GeneratePacket, portMAX_DELAY);
-						vPortFree(PacketRecieved->data);
-						vPortFree(PacketRecieved);
-						xSemaphoreGive(GeneratePacket);
-						continue;
-					}
-					break;
 				}
-
-				// if(ACK_recieved == 1)
-				// {
-				// 	break;
-				// }
-			}
-			else
-			{
-				trace_printf("Node %d: Awaiting ACK from %d No #%i, Attempt #%d\n", QueueHandleToNum(CurrentNode->CurrentQueue),
-																	   				QueueHandleToNum(PacketBackup[j]->header.reciever),
-																	   				CurrentSequence,
-																	   				i + 1);
-				trace_puts("Resending Packet...");
-				for(int k = j; k < N; k++)
-				{																
+				else
+				{
+					trace_printf("Node %d: Awaiting ACK from %d No #%i, Attempt #%d\n", QueueHandleToNum(CurrentNode->CurrentQueue),
+																						QueueHandleToNum(PacketBackup[j]->header.reciever),
+																						PacketBackup[j]->header.sequenceNumber,
+																						i + 1);
+					trace_puts("Resending Packets...");
 					xSemaphoreTake(GeneratePacket, portMAX_DELAY);
-					NumOfTries++;
-					PacketToSend = pvPortMalloc(sizeof(packet));
-					PacketToSend->data = pvPortMalloc((PacketBackup[k]->header.length - sizeof(header_t)) * sizeof(Payload_t));
-					memcpy(PacketToSend->data, PacketBackup[k]->data, sizeof(Payload_t) * (PacketBackup[k]->header.length - sizeof(header_t)));
-					memcpy(&PacketToSend->header, &PacketBackup[k]->header, sizeof(header_t));
-					xQueueSend(RouterQueue, &PacketToSend, portMAX_DELAY);
+					for(int k = j; k < N; k++)
+					{																
+						NumOfTries++;
+						PacketToSend = pvPortMalloc(sizeof(packet));
+						PacketToSend->data = pvPortMalloc((PacketBackup[k]->header.length - sizeof(header_t)) * sizeof(Payload_t));
+						memcpy(PacketToSend->data, PacketBackup[k]->data, sizeof(Payload_t) * (PacketBackup[k]->header.length - sizeof(header_t)));
+						memcpy(&PacketToSend->header, &PacketBackup[k]->header, sizeof(header_t));
+						xQueueSend(RouterQueue, &PacketToSend, portMAX_DELAY);
+					}
 					xSemaphoreGive(GeneratePacket);
 				}
-			}
-			}
+			} // End of Go-Back-N for loop
 		}
 
-		 if(ACK_recieved == 1)
-		 {
+		if(ACK_recieved == 1)
+		{
 			// Display Received Packets
-			trace_printf("\n\n***Node %d: Received ACK from %d to %d No #%d\n", QueueHandleToNum(CurrentNode->CurrentQueue),
+			trace_printf("\n\n***Node %d: Received ACKs from %d to %d No #%d\n", QueueHandleToNum(CurrentNode->CurrentQueue),
 																				QueueHandleToNum(PacketRecieved->header.sender),
 																				QueueHandleToNum(PacketRecieved->header.reciever),
 																				PacketRecieved->header.sequenceNumber);
-
-			totalACKsReceived++;
-			// BytesSuccess += PacketBackup->header.length;
 
 			xSemaphoreTake(GeneratePacket, portMAX_DELAY);
 			// trace_puts("Before Free 3");
@@ -606,14 +608,12 @@ void vSenderTask(void *pvParameters)
 				vPortFree(PacketBackup[i]->data);
 				vPortFree(PacketBackup[i]);
 			}
-			vPortFree(PacketRecieved->data);
-			vPortFree(PacketRecieved);
 			xSemaphoreGive(GeneratePacket);
 
 		 	trace_puts("Packet Sent Successfully, Sending Next Packet!");
-		 }
-		 else
-		 {
+		}
+		else
+		{
 		 	trace_printf("Node %d Did not receive ACK, Skipping Packet...\n", QueueHandleToNum(CurrentNode->CurrentQueue));
 
 			// BytesFailed += PacketBackup->header.length;
@@ -625,10 +625,12 @@ void vSenderTask(void *pvParameters)
 				vPortFree(PacketBackup[i]->data);
 				vPortFree(PacketBackup[i]);
 			}
-			
-			totalDropped++;
+
 			xSemaphoreGive(GeneratePacket);
-		 }
+		}
+		 
+		BytesFailed = BytesSent - BytesSuccess;
+		totalDropped = totalSent - totalACKsReceived;
 
 		 				/** System Statistics **/
 		printf("\n\n\n\n-------NODE %d STATISTICS--------\n", QueueHandleToNum(CurrentNode->CurrentQueue));
