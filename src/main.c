@@ -123,8 +123,8 @@ typedef struct {
 
 #define T1 					( pdMS_TO_TICKS(100) )
 #define T2 					( pdMS_TO_TICKS(200) )
-#define Tout 				( pdMS_TO_TICKS(150) )
-#define Pdrop 				( (double)0.01 )
+#define Tout 				( pdMS_TO_TICKS(225) )
+#define Pdrop 				( (double)0.08 )
 #define P_ack 				( (double)0.01 )
 #define P_WRONG_PACKET		( (double)0.0 )
 #define Tdelay				( pdMS_TO_TICKS(500) )
