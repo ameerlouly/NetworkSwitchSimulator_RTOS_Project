@@ -123,8 +123,8 @@ typedef struct {
 
 #define T1 					( pdMS_TO_TICKS(100) )
 #define T2 					( pdMS_TO_TICKS(200) )
-#define Tout 				( pdMS_TO_TICKS(225) )
-#define Pdrop 				( (double)0.08 )
+#define Tout 				( pdMS_TO_TICKS(200) )
+#define Pdrop 				( (double)0.01 )
 #define P_ack 				( (double)0.01 )
 #define P_WRONG_PACKET		( (double)0.0 )
 #define Tdelay				( pdMS_TO_TICKS(500) )
@@ -420,6 +420,7 @@ void vSenderTask(void *pvParameters)
 	NumOfPackets_t totalSent = 0;
 	NumOfPackets_t totalACKsReceived = 0;
 	NumOfPackets_t totalDropped = 0;
+	NumOfPackets_t NumOfTries = 0;
 
 	NumOfBytes_t BytesSent = 0;
 	NumOfBytes_t BytesSuccess = 0;
@@ -449,11 +450,11 @@ void vSenderTask(void *pvParameters)
 		{
 			// Failed to Generate Packet, Trying Again
 			trace_puts("Failed to Allocate Packet");
+			xSemaphoreGive(GeneratePacket);
 			continue;
 		}
 
 		PacketToSend->header.sender = CurrentNode->CurrentQueue;
-		// RandomNum(3, 4)
 		switch(RandomNum(3, 4))
 		{
 		case 3:
@@ -466,18 +467,18 @@ void vSenderTask(void *pvParameters)
 			break;
 		}
 
-		CurrentSequence = PacketToSend->header.sequenceNumber;
-
 		PacketToSend->header.length = RandomNum(L1, L2);
 		PacketToSend->data = pvPortMalloc((PacketToSend->header.length - sizeof(header_t)) * sizeof(Payload_t));
 		if(PacketToSend->data == NULL)
 		{
 			trace_puts("Failed to allocate data");
 			vPortFree(PacketToSend);
+			xSemaphoreGive(GeneratePacket);
 			continue;
 		}
 
-			/* Store A Backup of the Data transmitted in case of retransmission */
+			/* Store A Data in buffer till ACK is Recieved */
+		CurrentSequence = PacketToSend->header.sequenceNumber;
 		PacketBackup = pvPortMalloc(sizeof(packet));
 		PacketBackup->data = pvPortMalloc((PacketToSend->header.length - sizeof(header_t)) * sizeof(Payload_t));
 		memcpy(PacketBackup->data, PacketToSend->data, sizeof(Payload_t) * (PacketToSend->header.length - sizeof(header_t)));
@@ -564,6 +565,7 @@ void vSenderTask(void *pvParameters)
 																	   				i + 1);
 				trace_puts("Resending Packet...");																	
 				xSemaphoreTake(GeneratePacket, portMAX_DELAY);
+				NumOfTries++;
 				PacketToSend = pvPortMalloc(sizeof(packet));
 				PacketToSend->data = pvPortMalloc((PacketBackup->header.length - sizeof(header_t)) * sizeof(Payload_t));
 				memcpy(PacketToSend->data, PacketBackup->data, sizeof(Payload_t) * (PacketBackup->header.length - sizeof(header_t)));
@@ -613,6 +615,7 @@ void vSenderTask(void *pvParameters)
 		printf("\n\n\n\n-------NODE %d STATISTICS--------\n", QueueHandleToNum(CurrentNode->CurrentQueue));
 		printf("Total Packets Sent: %d\n", totalSent);
 		printf("Total ACKs Received: %d\n", totalACKsReceived);
+		printf("Total Re-Transmitted: %d\n", NumOfTries);
 		printf("Total Packets Dropped: %d\n\n", totalDropped);
 		printf("Bytes Sent: %ld\n", BytesSent);
 		printf("Bytes Successful: %ld\n", BytesSuccess);
