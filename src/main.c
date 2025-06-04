@@ -123,7 +123,7 @@ typedef struct {
 
 #define T1 					( pdMS_TO_TICKS(100) )
 #define T2 					( pdMS_TO_TICKS(200) )
-#define Tout 				( pdMS_TO_TICKS(150) )	// 150, 175, 200, 225
+#define Tout 				( pdMS_TO_TICKS(225) )	// 150, 175, 200, 225
 #define Pdrop 				( (double)0.08 )		// 0.01, 0.02, 0.04, 0.08
 #define P_ack 				( (double)0.01 )
 #define P_WRONG_PACKET		( (double)0.0 )
@@ -131,7 +131,7 @@ typedef struct {
 #define D					( pdMS_TO_TICKS(5) )
 #define C					( (uint32_t)100000 )
 #define K					( (uint16_t)40 )
-#define N					( (uint8_t)1 )
+#define N					( (uint8_t)2 )
 static const uint32_t	L1 = 500;
 static const uint32_t	L2 = 1500;
 
@@ -373,7 +373,7 @@ int main(int argc, char* argv[])
 	{
 		// Creating Tasks
 		status = xTaskCreate(vSenderTask, "Node 1", 512, (void*)&Node1, 1, &Node1Task);
-		status &= xTaskCreate(vSenderTask, "Node 2", 512, (void*)&Node2, 1, &Node2Task);
+		// status &= xTaskCreate(vSenderTask, "Node 2", 512, (void*)&Node2, 1, &Node2Task);
 		status &= xTaskCreate(vRecieverTask, "Node 3", 512, (void*)&Node3, 2, &Node3Task);
 		status &= xTaskCreate(vRecieverTask, "Node 4", 512, (void*)&Node4, 2, &Node4Task);
 		status &= xTaskCreate(vRouterTask, "Router", 512, (void*)&Router, 3, &RouterTask);
@@ -495,8 +495,8 @@ void vSenderTask(void *pvParameters)
 												
 			if(xQueueSend(RouterQueue, &PacketToSend, portMAX_DELAY) == pdPASS)
 			{
-				trace_printf("Node %d: Sent Successfully to %d\n", QueueHandleToNum(PacketToSend->header.sender),
-																QueueHandleToNum(PacketToSend->header.reciever));
+				// trace_printf("Node %d: Sent Successfully to %d\n", QueueHandleToNum(PacketToSend->header.sender),
+				// 												QueueHandleToNum(PacketToSend->header.reciever));
 				totalSent++;
 				BytesSent += PacketBackup[i]->header.length;
 			}
@@ -510,9 +510,11 @@ void vSenderTask(void *pvParameters)
 
 //? ****************** ACK Part (Sender Section) ********************************************************************************************************************
 		uint8_t ACK_recieved = 0;
-		for(int i = 0; i < NUM_OF_TRIES; i++)
+		uint8_t BufferStatus[N] = { 0 };
+		int j = 0;
+		while(j < N)
 		{
-			for(int j = 0; j < N; j++)
+			for(int i = 0; i < NUM_OF_TRIES; i++)
 			{
 				ACK_recieved = 0;
 				xTimerStart(CurrentNode->ACKToutTimer, 0);
@@ -520,7 +522,7 @@ void vSenderTask(void *pvParameters)
 				status = xQueueReceive(CurrentNode->CurrentQueue, &PacketRecieved, 0);
 				if(status == pdPASS)
 				{
-					trace_printf("Node %d: Recieved ACK from %d No #%i at Attempt #%d\n", QueueHandleToNum(CurrentNode->CurrentQueue),
+					trace_printf("------Node %d: Recieved ACK from %d No #%i at Attempt #%d\n", QueueHandleToNum(CurrentNode->CurrentQueue),
 																						QueueHandleToNum(PacketBackup[j]->header.reciever),
 																						PacketBackup[j]->header.sequenceNumber,
 																						i + 1);
@@ -528,10 +530,12 @@ void vSenderTask(void *pvParameters)
 					{
 						// SequenceToNode3 = PacketRecieved->header.sequenceNumber;
 						ACK_recieved = 1;
+						BufferStatus[j] = 1;
 						xSemaphoreTake(GeneratePacket, portMAX_DELAY);
 						vPortFree(PacketRecieved->data);
 						vPortFree(PacketRecieved);
 						xSemaphoreGive(GeneratePacket);
+						break; // Exit the Retry loop
 					}
 					else
 					{
@@ -564,12 +568,7 @@ void vSenderTask(void *pvParameters)
 					xSemaphoreGive(GeneratePacket);
 				}
 			} // End of Go-Back-N for loop
-
-			if(ACK_recieved == 1)
-			{
-				break;
-			}
-
+			j++;
 		} // End of Retry Loop
 
 		if(ACK_recieved == 1)
@@ -583,8 +582,16 @@ void vSenderTask(void *pvParameters)
 			// trace_puts("Before Free 3");
 			for(int i = 0; i < N; i++)
 			{
-				BytesSuccess += PacketBackup[i]->header.length;
-				totalACKsReceived++;
+				if(BufferStatus[i] == 1)
+				{
+					BytesSuccess += PacketBackup[i]->header.length;
+					totalACKsReceived++;
+				}
+				else
+				{
+					BytesFailed += PacketBackup[i]->header.length;
+					totalDropped++;
+				}
 				vPortFree(PacketBackup[i]->data);
 				vPortFree(PacketBackup[i]);
 			}
@@ -602,6 +609,16 @@ void vSenderTask(void *pvParameters)
 			// trace_puts("Before Free 4");
 			for(int i = 0; i < N; i++)
 			{
+				if(BufferStatus[i] == 1)
+				{
+					BytesSuccess += PacketBackup[i]->header.length;
+					totalACKsReceived++;
+				}
+				else
+				{
+					BytesFailed += PacketBackup[i]->header.length;
+					totalDropped++;
+				}
 				vPortFree(PacketBackup[i]->data);
 				vPortFree(PacketBackup[i]);
 			}
@@ -609,8 +626,8 @@ void vSenderTask(void *pvParameters)
 			xSemaphoreGive(GeneratePacket);
 		}
 		 
-		BytesFailed = BytesSent - BytesSuccess;
-		totalDropped = totalSent - totalACKsReceived;
+		// BytesFailed = BytesSent - BytesSuccess;
+		// totalDropped = totalSent - totalACKsReceived;
 
 		 				/** System Statistics **/
 		printf("\n\n\n\n-------NODE %d STATISTICS--------\n", QueueHandleToNum(CurrentNode->CurrentQueue));
