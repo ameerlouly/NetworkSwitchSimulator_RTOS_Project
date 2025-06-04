@@ -131,6 +131,8 @@ typedef struct {
 #define D					( pdMS_TO_TICKS(5) )
 #define C					( (uint32_t)100000 )
 #define K					( (uint16_t)40 )
+#define N					( (uint8_t) 2 )
+
 static const uint32_t	L1 = 500;
 static const uint32_t	L2 = 1500;
 
@@ -192,6 +194,8 @@ QueueHandle_t Node3Queue;
 QueueHandle_t Node4Queue;
 QueueHandle_t RouterQueue;
 QueueHandle_t RouterACKQueue;
+
+QueueHandle_t Node_GenQ[2];
 
 /** End of Queue Handles ******************************************************/
 
@@ -327,6 +331,10 @@ int main(int argc, char* argv[])
 	Node3Queue = xQueueCreate(10, sizeof(packet*));
 	Node4Queue = xQueueCreate(10, sizeof(packet*));
 	RouterQueue = xQueueCreate(20, sizeof(packet*));
+
+	Node_GenQ[0] = xQueueCreate(N, sizeof(packet*));
+	Node_GenQ[1] = xQueueCreate(N, sizeof(packet*));
+
 	// RouterACKQueue = xQueueCreate(10, sizeof(packet*));
 
 	/** Creating Semaphores **/
@@ -425,6 +433,10 @@ void vSenderTask(void *pvParameters)
 	NumOfBytes_t BytesSuccess = 0;
 	NumOfBytes_t BytesFailed = 0;
 
+	UBaseType_t MsgNum;
+	UBaseType_t UnAckedNum;
+	packet* Buffer[N];
+
 //?		/** Used for ACK Part **/
 	packet* PacketRecieved = NULL; // Buffer to store recieved ACK Packets
 	BaseType_t status;
@@ -478,136 +490,214 @@ void vSenderTask(void *pvParameters)
 		}
 
 			/* Store A Backup of the Data transmitted in case of retransmission */
-		PacketBackup = pvPortMalloc(sizeof(packet));
-		PacketBackup->data = pvPortMalloc((PacketToSend->header.length - sizeof(header_t)) * sizeof(Payload_t));
-		memcpy(PacketBackup->data, PacketToSend->data, sizeof(Payload_t) * (PacketToSend->header.length - sizeof(header_t)));
-		memcpy(&PacketBackup->header, &PacketToSend->header, sizeof(header_t));
+		
 
 
-		trace_printf("Node %d: Sending %d to %d No #%d\n", QueueHandleToNum(CurrentNode->CurrentQueue),
+		trace_printf("Node %d: generated %d to %d No #%d \n", QueueHandleToNum(CurrentNode->CurrentQueue),
 														   PacketToSend->header.length,
 														   QueueHandleToNum(PacketToSend->header.reciever),
 														   CurrentSequence);
+
+
+		if(xQueueSend(Node_GenQ[QueueHandleToNum(CurrentNode->CurrentQueue)], &PacketToSend, portMAX_DELAY) == pdPASS){
+			trace_printf("GenQ %d: recieved %d to %d No #%d \n", QueueHandleToNum(CurrentNode->CurrentQueue),
+																	PacketToSend->header.length,
+																	QueueHandleToNum(PacketToSend->header.reciever),
+																	CurrentSequence);
+
+		}
+
+		MsgNum = uxQueueMessagesWaiting(Node_GenQ[QueueHandleToNum(CurrentNode->CurrentQueue)]);
+
+		if(MsgNum>=N){
+
+			packet* pkt;
+			for(int i=0; i<N; i++)
+			{
+				if(xQueueReceive(Node_GenQ[QueueHandleToNum(CurrentNode->CurrentQueue)]), &pkt ,portMAX_DELAY){	
+					Buffer[i] = pkt;
+
+
+					 Buffer[i] = pvPortMalloc(sizeof(packet));
+					 Buffer[i]->data = pvPortMalloc((pkt->header.length - sizeof(header_t)) * sizeof(Payload_t));
+					 memcpy(Buffer[i]->data, pkt->data, sizeof(Payload_t) * (pkt->header.length - sizeof(header_t)));
+					 memcpy(&Buffer[i]->header, &pkt->header, sizeof(header_t));
+				}
+			}
+
+			for(int i=0; i<N; i++)
+			{
+				if(xQueueSend(RouterQueue, &Buffer[i], portMAX_DELAY) == pdPASS)
+				{
+					trace_printf("Node %d: Sent Successfully to %d\n  (in Gen_Q)", QueueHandleToNum(PacketToSend->header.sender),
+																	QueueHandleToNum(PacketToSend->header.reciever));
+					totalSent++;
+					BytesSent += PacketBackup->header.length;
+				}
+				else
+				{
+					trace_printf("Node %d: Failed to Send\n", QueueHandleToNum(CurrentNode->CurrentQueue));
+				}
+			}
+
+	    }
+
 											 
-		if(xQueueSend(RouterQueue, &PacketToSend, portMAX_DELAY) == pdPASS)
-		{
-			trace_printf("Node %d: Sent Successfully to %d\n", QueueHandleToNum(PacketToSend->header.sender),
-															   QueueHandleToNum(PacketToSend->header.reciever));
-			totalSent++;
-			BytesSent += PacketBackup->header.length;
-		}
-		else
-		{
-			trace_printf("Node %d: Failed to Send\n", QueueHandleToNum(CurrentNode->CurrentQueue));
-		}
+		
 
 		xSemaphoreGive(GeneratePacket);
 
 //? ****************** ACK Part (Sender Section) ********************************************************************************************************************
-		uint8_t ACK_recieved = 0;
+		//uint8_t ACK_recieved[N] = {0};
+
 		for(int i = 0; i < NUM_OF_TRIES; i++)
 		{
 			xTimerStart(CurrentNode->ACKToutTimer, 0);
 			xSemaphoreTake(CurrentNode->ACK_Sema, portMAX_DELAY);
-			status = xQueueReceive(CurrentNode->CurrentQueue, &PacketRecieved, 0);
-			if(status == pdPASS)
-			{
-				switch(QueueHandleToNum(PacketRecieved->header.sender))
-				{
-					case 3:
-					if(PacketRecieved->header.sequenceNumber >= SequenceToNode3)
-					{
-						SequenceToNode3 = PacketRecieved->header.sequenceNumber;
-						ACK_recieved = 1;
+
+				for(int j=0; j<N; j++) // here we count the unAcked backets (the backets still in the buffer)
+				{ 
+					if(Buffer[i]!=NULL){
+						UnAckedNum++;
 					}
-					else
-					{
-						// In case of recieving an old ACK from a previous packet
-						// trace_puts("Before Free 1");
-						xSemaphoreTake(GeneratePacket, portMAX_DELAY);
-						vPortFree(PacketRecieved->data);
-						vPortFree(PacketRecieved);
-						xSemaphoreGive(GeneratePacket);
-						continue;
-					}
-					break;
-					
-					case 4:
-					if(PacketRecieved->header.sequenceNumber >= SequenceToNode4)
-					{
-						SequenceToNode4 = PacketRecieved->header.sequenceNumber;
-						ACK_recieved = 1;
-					}
-					else
-					{
-						// In case of recieving an old ACK from a previous packet
-						// trace_puts("Before Free 2");
-						xSemaphoreTake(GeneratePacket, portMAX_DELAY);
-						vPortFree(PacketRecieved->data);
-						vPortFree(PacketRecieved);
-						xSemaphoreGive(GeneratePacket);
-						continue;
-					}
-					break;
 				}
 
-				if(ACK_recieved == 1)
+				for(int j = N-UnAckedNum; j<N; j++) // now we loop on the unAcked packets from number (N-UnAckedNum) to the end of the Buffer to check for recieved acks or to send the packets again
 				{
-					break;
+
+
+					status = xQueueReceive(CurrentNode->CurrentQueue, &PacketRecieved, 0);
+					if(status == pdPASS)
+					{
+						switch(QueueHandleToNum(PacketRecieved->header.sender))
+						{
+							case 3:
+							if(PacketRecieved->header.sequenceNumber >= SequenceToNode3)
+							{
+								SequenceToNode3 = PacketRecieved->header.sequenceNumber;
+								if(PacketRecieved->header.sequenceNumber==Buffer[j].header.sequenceNumber){
+										Buffer[j]=NULL;
+								}
+								
+								//ACK_recieved = 1;
+							}
+							else
+							{
+								// In case of recieving an old ACK from a previous packet
+								// trace_puts("Before Free 1");
+								xSemaphoreTake(GeneratePacket, portMAX_DELAY);
+								vPortFree(PacketRecieved->data);
+								vPortFree(PacketRecieved);
+								xSemaphoreGive(GeneratePacket);
+								continue;
+							}
+							break;
+							
+							case 4:
+							if(PacketRecieved->header.sequenceNumber >= SequenceToNode4)
+							{
+								SequenceToNode4 = PacketRecieved->header.sequenceNumber;
+								if(PacketRecieved->header.sequenceNumber == Buffer[j].header.sequenceNumber){
+										Buffer[j]=NULL;
+								}
+								//ACK_recieved = 1;
+							}
+							else
+							{
+								// In case of recieving an old ACK from a previous packet
+								// trace_puts("Before Free 2");
+								xSemaphoreTake(GeneratePacket, portMAX_DELAY);
+								vPortFree(PacketRecieved->data);
+								vPortFree(PacketRecieved);
+								xSemaphoreGive(GeneratePacket);
+								continue;
+							}
+							break;
+						}
+
+						if(Buffer[j] == NULL) // it was ACK_recieved == 1
+						{
+							break;
+						}
+					}
+					else
+					{
+						break;
+					}
 				}
-			}
-			else
-			{
-				trace_printf("Node %d: Awaiting ACK from %d No #%i, Attempt #%d\n", QueueHandleToNum(CurrentNode->CurrentQueue),
-																	   				QueueHandleToNum(PacketBackup->header.reciever),
-																	   				CurrentSequence,
-																	   				i + 1);
-				trace_puts("Resending Packet...");																	
-				xSemaphoreTake(GeneratePacket, portMAX_DELAY);
-				PacketToSend = pvPortMalloc(sizeof(packet));
-				PacketToSend->data = pvPortMalloc((PacketBackup->header.length - sizeof(header_t)) * sizeof(Payload_t));
-				memcpy(PacketToSend->data, PacketBackup->data, sizeof(Payload_t) * (PacketBackup->header.length - sizeof(header_t)));
-				memcpy(&PacketToSend->header, &PacketBackup->header, sizeof(header_t));																
-			 	xQueueSend(RouterQueue, &PacketToSend, portMAX_DELAY);
-				xSemaphoreGive(GeneratePacket);
-			}
+
+				
+				for(int j=0; j<N; j++) // here we count the unAcked backets (the backets still in the buffer)
+				{ 
+					if(Buffer[i]!=NULL){
+						UnAckedNum++;
+					}
+				}
+
+				if(UnAckedNum !=0){
+
+					for(int j = N-UnAckedNum; j<N; j++){
+						trace_printf("Node %d: Awaiting ACK from %d No #%i, Attempt #%d\n", QueueHandleToNum(CurrentNode->CurrentQueue),
+																						QueueHandleToNum(Buffer[j]->header.reciever),
+																						Buffer[j]->header.sequenceNumber,
+																						i + 1);
+						trace_puts("Resending Packet...");																	
+						xSemaphoreTake(GeneratePacket, portMAX_DELAY);
+						PacketToSend = pvPortMalloc(sizeof(packet));
+						PacketToSend->data = pvPortMalloc((Buffer[j]->header.length - sizeof(header_t)) * sizeof(Payload_t));
+						memcpy(PacketToSend->data, Buffer[j]->data, sizeof(Payload_t) * (Buffer[j]->header.length - sizeof(header_t)));
+						memcpy(&PacketToSend->header, &Buffer[j]->header, sizeof(header_t));																
+						xQueueSend(RouterQueue, &PacketToSend, portMAX_DELAY);
+						xSemaphoreGive(GeneratePacket);
+
+					}
+					
+
+				}
+
+				
+
+				
 		}
 
-		 if(ACK_recieved == 1)
-		 {
-			// Display Received Packets
-			trace_printf("\n\n***Node %d: Received ACK from %d to %d No #%d\n", QueueHandleToNum(CurrentNode->CurrentQueue),
-																				QueueHandleToNum(PacketRecieved->header.sender),
-																				QueueHandleToNum(PacketRecieved->header.reciever),
-																				PacketRecieved->header.sequenceNumber);
 
-			totalACKsReceived++;
-			BytesSuccess += PacketBackup->header.length;
+		if(ACK_recieved == 1)
+		{
+					// Display Received Packets
+					trace_printf("\n\n***Node %d: Received ACK from %d to %d No #%d\n", QueueHandleToNum(CurrentNode->CurrentQueue),
+																						QueueHandleToNum(PacketRecieved->header.sender),
+																						QueueHandleToNum(PacketRecieved->header.reciever),
+																						PacketRecieved->header.sequenceNumber);
 
-			xSemaphoreTake(GeneratePacket, portMAX_DELAY);
-			// trace_puts("Before Free 3");
-			vPortFree(PacketBackup->data);
-			vPortFree(PacketBackup);
-			vPortFree(PacketRecieved->data);
-			vPortFree(PacketRecieved);
-			xSemaphoreGive(GeneratePacket);
+					totalACKsReceived++;
+					BytesSuccess += PacketBackup->header.length;
 
-		 	trace_puts("Packet Sent Successfully, Sending Next Packet!");
-		 }
-		 else
-		 {
-		 	trace_printf("Node %d Did not receive ACK, Skipping Packet...\n", QueueHandleToNum(CurrentNode->CurrentQueue));
+					xSemaphoreTake(GeneratePacket, portMAX_DELAY);
+					// trace_puts("Before Free 3");
+					vPortFree(PacketBackup->data);
+					vPortFree(PacketBackup);
+					vPortFree(PacketRecieved->data);
+					vPortFree(PacketRecieved);
+					xSemaphoreGive(GeneratePacket);
 
-			BytesFailed += PacketBackup->header.length;
+					trace_puts("Packet Sent Successfully, Sending Next Packet!");
+		}
+		else
+		{
+					trace_printf("Node %d Did not receive ACK, Skipping Packet...\n", QueueHandleToNum(CurrentNode->CurrentQueue));
 
-			xSemaphoreTake(GeneratePacket, portMAX_DELAY);
-			// trace_puts("Before Free 4");
-			vPortFree(PacketBackup->data);
-		 	vPortFree(PacketBackup);
+					BytesFailed += PacketBackup->header.length;
+
+					xSemaphoreTake(GeneratePacket, portMAX_DELAY);
+					// trace_puts("Before Free 4");
+					vPortFree(PacketBackup->data);
+					vPortFree(PacketBackup);
+					
+					totalDropped++;
+					xSemaphoreGive(GeneratePacket);
+		}
+
 			
-			totalDropped++;
-			xSemaphoreGive(GeneratePacket);
-		 }
 
 		 				/** System Statistics **/
 		printf("\n\n\n\n-------NODE %d STATISTICS--------\n", QueueHandleToNum(CurrentNode->CurrentQueue));
