@@ -124,7 +124,7 @@ typedef struct {
 #define T1 					( pdMS_TO_TICKS(100) )
 #define T2 					( pdMS_TO_TICKS(200) )
 #define Tout 				( pdMS_TO_TICKS(200) )	// 150, 175, 200, 225
-#define Pdrop 				( (double)0.01 )		// 0.01, 0.02, 0.04, 0.08
+#define Pdrop 				( (double)0.02 )		// 0.01, 0.02, 0.04, 0.08
 #define P_ack 				( (double)0.01 )
 #define P_WRONG_PACKET		( (double)0.0 )
 #define Tdelay				( pdMS_TO_TICKS(50) )
@@ -331,10 +331,10 @@ int main(int argc, char* argv[])
 //	}
 
 	/** Creating Queues **/
-	Node1Queue = xQueueCreate(10, sizeof(packet*));
-	Node2Queue = xQueueCreate(10, sizeof(packet*));
-	Node3Queue = xQueueCreate(10, sizeof(packet*));
-	Node4Queue = xQueueCreate(10, sizeof(packet*));
+	Node1Queue = xQueueCreate(20, sizeof(packet*));
+	Node2Queue = xQueueCreate(20, sizeof(packet*));
+	Node3Queue = xQueueCreate(40, sizeof(packet*));
+	Node4Queue = xQueueCreate(40, sizeof(packet*));
 	RouterQueue = xQueueCreate(40, sizeof(packet*));
 	RouterACKQueue = xQueueCreate(40, sizeof(packet*));
 
@@ -530,7 +530,8 @@ void vSenderTask(void *pvParameters)
 		int j = 0;
 		while(j < N)
 		{
-			for(int i = 0; i < NUM_OF_TRIES; i++)
+			int i = 0;
+			while(i < NUM_OF_TRIES)
 			{
 				ACK_recieved = 0;
 				xTimerStart(CurrentNode->ACKToutTimer, 0);
@@ -553,12 +554,13 @@ void vSenderTask(void *pvParameters)
 						vPortFree(PacketRecieved->data);
 						vPortFree(PacketRecieved);
 						xSemaphoreGive(GeneratePacket);
+						i++;
 						break; // Exit the Retry loop
 					}
 					else
 					{
 						// In case of recieving an old ACK from a previous packet
-						trace_puts("____OLD ACK____");
+						trace_puts("____OLD ACK____: Resending Packets");
 						xSemaphoreTake(GeneratePacket, portMAX_DELAY);
 						vPortFree(PacketRecieved->data);
 						vPortFree(PacketRecieved);
@@ -579,6 +581,13 @@ void vSenderTask(void *pvParameters)
 																						PacketBackup[j]->header.sequenceNumber,
 																						i + 1);
 					trace_puts("Resending Packets...");
+
+					while(xQueueReceive(CurrentNode->CurrentQueue, &PacketRecieved, 0) == pdPASS)
+					{
+						vPortFree(PacketRecieved->data);
+						vPortFree(PacketRecieved);
+					}
+
 					xSemaphoreTake(GeneratePacket, portMAX_DELAY);
 					for(int k = j; k < N; k++)
 					{																
@@ -590,6 +599,7 @@ void vSenderTask(void *pvParameters)
 						xQueueSend(RouterQueue, &PacketToSend, portMAX_DELAY);
 					}
 					xSemaphoreGive(GeneratePacket);
+					i++;
 				}
 			} // End of Retry Loop
 			j++;
@@ -671,7 +681,7 @@ void vSenderTask(void *pvParameters)
 		printf("Bytes Failed: %ld\n", BytesFailed);
 		puts("------------------------------------------\n\n\n\n\n");
 
-		if(totalSent == 1200)
+		if(totalSent == 500)
 		{
 			endTime = xTaskGetTickCount();
 			trace_puts("\n\n\n...SUSPENDING ALL TASKS...\n");
@@ -1059,6 +1069,9 @@ void vApplicationMallocFailedHook( void )
 	internally by FreeRTOS API functions that create tasks, queues, software
 	timers, and semaphores.  The size of the FreeRTOS heap is set by the
 	configTOTAL_HEAP_SIZE configuration constant in FreeRTOSConfig.h. */
+	endTime = xTaskGetTickCount();
+	trace_puts("\n\n\n...MALLOC FAILED...\n");
+	trace_printf("Total Elapsed Time = %ld seconds", ((endTime - startTime) * portTICK_PERIOD_MS) / 1000);
 	for( ;; );
 }
 /*-----------------------------------------------------------*/
