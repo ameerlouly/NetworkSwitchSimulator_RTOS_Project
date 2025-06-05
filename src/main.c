@@ -123,7 +123,7 @@ typedef struct {
 
 #define T1 					( pdMS_TO_TICKS(100) )
 #define T2 					( pdMS_TO_TICKS(200) )
-#define Tout 				( pdMS_TO_TICKS(200) )
+#define Tout 				( pdMS_TO_TICKS(150) )
 #define Pdrop 				( (double)0.01 )
 #define P_ack 				( (double)0.01 )
 #define P_WRONG_PACKET		( (double)0.0 )
@@ -516,7 +516,7 @@ void vSenderTask(void *pvParameters)
 				switch(QueueHandleToNum(PacketRecieved->header.sender))
 				{
 					case 3:
-					if(PacketRecieved->header.sequenceNumber >= PacketBackup->header.sequenceNumber)
+					if(PacketRecieved->header.sequenceNumber >= SequenceToNode3)
 					{
 						SequenceToNode3 = PacketRecieved->header.sequenceNumber;
 						ACK_recieved = 1;
@@ -534,7 +534,7 @@ void vSenderTask(void *pvParameters)
 					break;
 					
 					case 4:
-					if(PacketRecieved->header.sequenceNumber >= PacketBackup->header.sequenceNumber)
+					if(PacketRecieved->header.sequenceNumber >= SequenceToNode4)
 					{
 						SequenceToNode4 = PacketRecieved->header.sequenceNumber;
 						ACK_recieved = 1;
