@@ -150,6 +150,7 @@ TimerHandle_t tNode1_Sender = NULL;
 TimerHandle_t tNode2_Sender = NULL;
 
 TimerHandle_t tRouterDelay = NULL;
+TimerHandle_t tRouterACKDelay = NULL;
 
 TimerHandle_t	tNode1_ACKTout = NULL;
 TimerHandle_t	tNode2_ACKTout = NULL;
@@ -162,6 +163,7 @@ SemaphoreHandle_t Node1SendData;
 SemaphoreHandle_t Node2SendData;
 
 SemaphoreHandle_t RouterTransmit;
+SemaphoreHandle_t RouterACKTransmit;
 
 SemaphoreHandle_t HandleToNum;
 
@@ -181,6 +183,7 @@ TaskHandle_t Node2Task = NULL;
 TaskHandle_t Node3Task = NULL;
 TaskHandle_t Node4Task = NULL;
 TaskHandle_t RouterTask = NULL;
+TaskHandle_t RouterACKTask = NULL;
 
 /** End of Task Handles *******************************************************/
 
@@ -304,6 +307,11 @@ int main(int argc, char* argv[])
 								pdFALSE,
 								(void*)1,
 								vRouterDelayCallBack);
+	tRouterACKDelay = xTimerCreate("Router ACK Delay Timer",
+								Tdelay,
+								pdFALSE,
+								(void*)2,
+								vRouterDelayCallBack);
 	tNode1_ACKTout = xTimerCreate("Node 1 Tout",
 								 Tout,
 								 pdFALSE,
@@ -327,7 +335,7 @@ int main(int argc, char* argv[])
 	Node3Queue = xQueueCreate(10, sizeof(packet*));
 	Node4Queue = xQueueCreate(10, sizeof(packet*));
 	RouterQueue = xQueueCreate(20, sizeof(packet*));
-	// RouterACKQueue = xQueueCreate(10, sizeof(packet*));
+	RouterACKQueue = xQueueCreate(20, sizeof(packet*));
 
 	/** Creating Semaphores **/
 	Node1SendData = xSemaphoreCreateBinary();
@@ -341,6 +349,9 @@ int main(int argc, char* argv[])
 
 	RouterTransmit = xSemaphoreCreateBinary();
 	xSemaphoreTake(RouterTransmit, 0);
+
+	RouterACKTransmit = xSemaphoreCreateBinary();
+	xSemaphoreTake(RouterACKTransmit, 0);
 
 	GeneratePacket = xSemaphoreCreateMutex();
 	xSemaphoreGive(GeneratePacket);
@@ -362,13 +373,15 @@ int main(int argc, char* argv[])
 	NodeType_t Node3 = {Node3Task, Node3Queue, NULL, NULL, NULL, NULL};
 	NodeType_t Node4 = {Node4Task, Node4Queue, NULL, NULL, NULL, NULL};
 	NodeType_t Router = {RouterTask, RouterQueue, tRouterDelay, NULL, RouterTransmit, NULL};
+	NodeType_t RouterACK = {RouterACKTask, RouterACKQueue, tRouterACKDelay, NULL, RouterACKTransmit, NULL};
 
 	/** End of Node Types Definitions *********************************************/
 	if(		Node1Queue != NULL &&
 			Node2Queue != NULL &&
 			Node3Queue != NULL &&
 			Node4Queue != NULL &&
-			RouterQueue != NULL)	// Check if Queue Creation was successful
+			RouterQueue != NULL &&
+			RouterACKQueue != NULL)	// Check if Queue Creation was successful
 	{
 		// Creating Tasks
 		status = xTaskCreate(vSenderTask, "Node 1", 512, (void*)&Node1, 1, &Node1Task);
@@ -376,6 +389,7 @@ int main(int argc, char* argv[])
 		status &= xTaskCreate(vRecieverTask, "Node 3", 512, (void*)&Node3, 2, &Node3Task);
 		status &= xTaskCreate(vRecieverTask, "Node 4", 512, (void*)&Node4, 2, &Node4Task);
 		status &= xTaskCreate(vRouterTask, "Router", 512, (void*)&Router, 3, &RouterTask);
+		status &= xTaskCreate(vRouterTask, "RouterACK", 512, (void*)&RouterACK, 3, &RouterACKTask);
 		
 
 		if(status == pdPASS)
@@ -772,7 +786,7 @@ void vRecieverTask(void *pvParameters)
 				// 												  	  			PacketToSend->header.sequenceNumber);
 
 				if((QueueHandleToNum(PacketToSend->header.sender) != 255) && (QueueHandleToNum(PacketToSend->header.reciever) != 255))
-					xQueueSend(RouterQueue, &PacketToSend, portMAX_DELAY); // Send ACK
+					xQueueSend(RouterACKQueue, &PacketToSend, portMAX_DELAY); // Send ACK
 				else
 				{
 					printf("Receiver %d: Data Corrupted", QueueHandleToNum(CurrentNode->CurrentQueue));
@@ -806,7 +820,7 @@ void vRouterTask(void *pvParameters)
 
 	while(1)
 	{
-		status = xQueueReceive(RouterQueue, &PacketRecieved, portMAX_DELAY);
+		status = xQueueReceive(CurrentNode->CurrentQueue, &PacketRecieved, portMAX_DELAY);
 		// status = xQueueReceive(RouterACKQueue, &ACKReceived, pdMS_TO_TICKS(1));
 
 		if(QueueHandleToNum(PacketRecieved->header.sender) == 255 || QueueHandleToNum(PacketRecieved->header.reciever) == 255)
@@ -945,8 +959,18 @@ void vSenderTimerCallBack(TimerHandle_t xTimer)
 
 static void vRouterDelayCallBack(TimerHandle_t xTimer)
 {
+	int timerID = (int)pvTimerGetTimerID(xTimer);
 	BaseType_t xHigherPriorityTaskWoken = pdFALSE;
-	xSemaphoreGiveFromISR(RouterTransmit, xHigherPriorityTaskWoken);
+	
+	switch(timerID)
+	{
+	case 1:
+		xSemaphoreGiveFromISR(RouterTransmit, xHigherPriorityTaskWoken);
+		break;
+	case 2:
+		xSemaphoreGiveFromISR(RouterACKTransmit, xHigherPriorityTaskWoken);
+		break;
+	}
 
 	if(xHigherPriorityTaskWoken)
 	{
