@@ -622,7 +622,7 @@ void vSenderTask(void *pvParameters)
 		printf("Bytes Failed: %ld\n", BytesFailed);
 		puts("------------------------------------------\n\n\n\n\n");
 
-		if(totalSent == 2500)
+		if(totalSent == 1200)
 		{
 			endTime = xTaskGetTickCount();
 			trace_puts("\n\n\n...SUSPENDING ALL TASKS...\n");
