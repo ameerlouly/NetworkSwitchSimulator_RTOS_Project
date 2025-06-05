@@ -516,7 +516,7 @@ void vSenderTask(void *pvParameters)
 				switch(QueueHandleToNum(PacketRecieved->header.sender))
 				{
 					case 3:
-					if(PacketRecieved->header.sequenceNumber >= SequenceToNode3)
+					if(PacketRecieved->header.sequenceNumber >= PacketBackup->header.sequenceNumber)
 					{
 						SequenceToNode3 = PacketRecieved->header.sequenceNumber;
 						ACK_recieved = 1;
@@ -534,7 +534,7 @@ void vSenderTask(void *pvParameters)
 					break;
 					
 					case 4:
-					if(PacketRecieved->header.sequenceNumber >= SequenceToNode4)
+					if(PacketRecieved->header.sequenceNumber >= PacketBackup->header.sequenceNumber)
 					{
 						SequenceToNode4 = PacketRecieved->header.sequenceNumber;
 						ACK_recieved = 1;
