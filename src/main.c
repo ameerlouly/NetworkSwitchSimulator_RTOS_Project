@@ -123,7 +123,7 @@ typedef struct {
 
 #define T1 					( pdMS_TO_TICKS(100) )
 #define T2 					( pdMS_TO_TICKS(200) )
-#define Tout 				( pdMS_TO_TICKS(200) )	// 150, 175, 200, 225
+#define Tout 				( pdMS_TO_TICKS(150) )	// 150, 175, 200, 225
 #define Pdrop 				( (double)0.01 )		// 0.01, 0.02, 0.04, 0.08
 #define P_ack 				( (double)0.01 )
 #define P_WRONG_PACKET		( (double)0.0 )
@@ -131,7 +131,7 @@ typedef struct {
 #define D					( pdMS_TO_TICKS(5) )
 #define C					( (uint32_t)100000 )
 #define K					( (uint16_t)40 )
-#define N					( (uint8_t)2 )
+#define N					( (uint8_t)1 )
 static const uint32_t	L1 = 500;
 static const uint32_t	L2 = 1500;
 
@@ -323,10 +323,10 @@ int main(int argc, char* argv[])
 //	}
 
 	/** Creating Queues **/
-	Node1Queue = xQueueCreate(20, sizeof(packet*));
-	Node2Queue = xQueueCreate(20, sizeof(packet*));
-	Node3Queue = xQueueCreate(20, sizeof(packet*));
-	Node4Queue = xQueueCreate(20, sizeof(packet*));
+	Node1Queue = xQueueCreate(10, sizeof(packet*));
+	Node2Queue = xQueueCreate(10, sizeof(packet*));
+	Node3Queue = xQueueCreate(10, sizeof(packet*));
+	Node4Queue = xQueueCreate(10, sizeof(packet*));
 	RouterQueue = xQueueCreate(40, sizeof(packet*));
 	// RouterACKQueue = xQueueCreate(10, sizeof(packet*));
 
@@ -373,7 +373,7 @@ int main(int argc, char* argv[])
 	{
 		// Creating Tasks
 		status = xTaskCreate(vSenderTask, "Node 1", 512, (void*)&Node1, 1, &Node1Task);
-		// status &= xTaskCreate(vSenderTask, "Node 2", 512, (void*)&Node2, 1, &Node2Task);
+		status &= xTaskCreate(vSenderTask, "Node 2", 512, (void*)&Node2, 1, &Node2Task);
 		status &= xTaskCreate(vRecieverTask, "Node 3", 512, (void*)&Node3, 2, &Node3Task);
 		status &= xTaskCreate(vRecieverTask, "Node 4", 512, (void*)&Node4, 2, &Node4Task);
 		status &= xTaskCreate(vRouterTask, "Router", 512, (void*)&Router, 3, &RouterTask);
@@ -510,8 +510,8 @@ void vSenderTask(void *pvParameters)
 		}	// End of Go-Back-N for loop
 
 //? ****************** ACK Part (Sender Section) ********************************************************************************************************************
-		uint8_t ACK_recieved = 0;
-		uint8_t BufferStatus[N] = { 0 };
+		uint8_t ACK_recieved = 0;	// Used only for Status Message after Checking transmission Buffer ACKs
+		uint8_t BufferStatus[N] = { 0 };	// Used to track the status of each ACK in transmission Buffer
 		int j = 0;
 		while(j < N)
 		{
@@ -568,9 +568,16 @@ void vSenderTask(void *pvParameters)
 					}
 					xSemaphoreGive(GeneratePacket);
 				}
-			} // End of Go-Back-N for loop
+			} // End of Retry Loop
 			j++;
-		} // End of Retry Loop
+		} // End of Go-Back-N for loop
+
+		// Clear Queue from all old ACKs
+		while(xQueueReceive(CurrentNode->CurrentQueue, &PacketRecieved, 0) == pdPASS)
+		{
+			vPortFree(PacketRecieved->data);
+			vPortFree(PacketRecieved);
+		}
 
 		if(ACK_recieved == 1)
 		{
@@ -641,7 +648,7 @@ void vSenderTask(void *pvParameters)
 		printf("Bytes Failed: %ld\n", BytesFailed);
 		puts("------------------------------------------\n\n\n\n\n");
 
-		if(totalSent == 2500)
+		if(totalSent == 1200)
 		{
 			endTime = xTaskGetTickCount();
 			trace_puts("\n\n\n...SUSPENDING ALL TASKS...\n");
@@ -726,6 +733,11 @@ void vRecieverTask(void *pvParameters)
 					break;
 				}
 				totalLost += ReceivedData.sequenceNumber - previousSequence1 - 1;
+				if(totalLost != 0)
+				{
+					totalLost = 0;
+					continue;
+				}
 				previousSequence1 = ReceivedData.sequenceNumber;
 				break;
 
@@ -736,6 +748,11 @@ void vRecieverTask(void *pvParameters)
 					break;
 				}
 				totalLost += ReceivedData.sequenceNumber - previousSequence2 - 1;
+				if(totalLost != 0)
+				{
+					totalLost = 0;
+					continue;
+				}
 				previousSequence2 = ReceivedData.sequenceNumber;
 				break;
 			}
